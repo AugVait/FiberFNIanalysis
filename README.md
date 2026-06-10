@@ -1,4 +1,6 @@
-# LHCb Fibers Analysis Workspace
+# FiberFNIanalysis
+
+LHCb fibers analysis workspace.
 
 This workspace is arranged so Git can sync the reproducible analysis methods while large or generated material stays local.
 
