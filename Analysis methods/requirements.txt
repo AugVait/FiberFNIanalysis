@@ -1,0 +1,14 @@
+numpy
+matplotlib
+scipy
+pandas
+pillow
+imageio
+tifffile
+h5py
+xarray
+scikit-image
+lmfit
+pybaselines
+tqdm
+ipykernel

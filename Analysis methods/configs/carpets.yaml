@@ -1,0 +1,7 @@
+# Hamamatsu streak-camera carpet visualization settings.
+out_subdir: "carpets"
+top_edge_crop_rows: 12
+background_percentile: 5
+signal_scale_percentile: 99.4
+asinh_scale_divisor: 8
+contact_sheet_max_columns: 4

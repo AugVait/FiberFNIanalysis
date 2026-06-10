@@ -1,0 +1,252 @@
+# Edit include values, then rerun python -m lhcb_fibers_analysis.plot_pl_spectra.
+# include: true writes an individual PNG and adds the spectrum to the combined sample PNG.
+# single is kept for older configs, but include is the output toggle in the current folder layout.
+group: "bcf1_noir"
+title: "bcf1_noir"
+x_min_nm: 400
+x_max_nm: 720
+colormap: "brg"
+spectra:
+  - include: false
+    single: true
+    path: "bcf1_noir_550cwl_ex360nm_calc.txt"
+    label: "bcf1_noir, 550 cwl"
+    position_token: ""
+    distance_cm: ""
+    position_suffix: ""
+    measurement_date: ""
+    note: "standard_duplicate_or_older_replicate"
+  - include: true
+    single: true
+    path: "bcf1_noir_550cwl_ex360nm_8nJ_calc.txt"
+    label: "bcf1_noir, 550 cwl"
+    position_token: ""
+    distance_cm: ""
+    position_suffix: ""
+    measurement_date: ""
+    note: "included_in_overlay"
+  - include: true
+    single: true
+    path: "2026 04 15/bcf1_noir_38cm_550cwl_ex360nm_8nJ_100um_calc.txt"
+    label: "bcf1_noir, 38cm, 550 cwl, 2026-04-15"
+    position_token: "38cm"
+    distance_cm: 38
+    position_suffix: ""
+    measurement_date: "2026-04-15"
+    note: "included_in_overlay"
+  - include: false
+    single: true
+    path: "2026 04 16/bcf1_noir_37cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 37cm, 550 cwl, 2026-04-16"
+    position_token: "37cm"
+    distance_cm: 37
+    position_suffix: ""
+    measurement_date: "2026-04-16"
+    note: "standard_duplicate_or_older_replicate"
+  - include: false
+    single: true
+    path: "2026 04 16/bcf1_noir_37cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 37cm1, 550 cwl, 2026-04-16"
+    position_token: "37cm1"
+    distance_cm: 37
+    position_suffix: "1"
+    measurement_date: "2026-04-16"
+    note: "standard_duplicate_or_older_replicate"
+  - include: false
+    single: true
+    path: "2026 04 16/bcf1_noir_67cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 67cm, 550 cwl, 2026-04-16"
+    position_token: "67cm"
+    distance_cm: 67
+    position_suffix: ""
+    measurement_date: "2026-04-16"
+    note: "standard_duplicate_or_older_replicate"
+  - include: false
+    single: true
+    path: "2026 04 16/bcf1_noir_69cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 69cm, 550 cwl, 2026-04-16"
+    position_token: "69cm"
+    distance_cm: 69
+    position_suffix: ""
+    measurement_date: "2026-04-16"
+    note: "standard_duplicate_or_older_replicate"
+  - include: false
+    single: true
+    path: "2026 04 16/bcf1_noir_100cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 100cm, 550 cwl, 2026-04-16"
+    position_token: "100cm"
+    distance_cm: 100
+    position_suffix: ""
+    measurement_date: "2026-04-16"
+    note: "standard_duplicate_or_older_replicate"
+  - include: false
+    single: true
+    path: "2026 04 16/bcf1_noir_100cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 100cm1, 550 cwl, 2026-04-16"
+    position_token: "100cm1"
+    distance_cm: 100
+    position_suffix: "1"
+    measurement_date: "2026-04-16"
+    note: "standard_duplicate_or_older_replicate"
+  - include: true
+    single: true
+    path: "2026 04 16/bcf1_noir_100cm2_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 100cm2, 550 cwl, 2026-04-16"
+    position_token: "100cm2"
+    distance_cm: 100
+    position_suffix: "2"
+    measurement_date: "2026-04-16"
+    note: "included_in_overlay"
+  - include: false
+    single: true
+    path: "2026 04 16/bcf1_noir_150cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 150cm, 550 cwl, 2026-04-16"
+    position_token: "150cm"
+    distance_cm: 150
+    position_suffix: ""
+    measurement_date: "2026-04-16"
+    note: "standard_duplicate_or_older_replicate"
+  - include: true
+    single: true
+    path: "2026 04 16/bcf1_noir_211cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 211cm, 550 cwl, 2026-04-16"
+    position_token: "211cm"
+    distance_cm: 211
+    position_suffix: ""
+    measurement_date: "2026-04-16"
+    note: "included_in_overlay"
+  - include: false
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_37cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 37cm, 550 cwl, 2026-04-17"
+    position_token: "37cm"
+    distance_cm: 37
+    position_suffix: ""
+    measurement_date: "2026-04-17"
+    note: "standard_duplicate_or_older_replicate"
+  - include: true
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_37cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 37cm1, 550 cwl, 2026-04-17"
+    position_token: "37cm1"
+    distance_cm: 37
+    position_suffix: "1"
+    measurement_date: "2026-04-17"
+    note: "included_in_overlay"
+  - include: true
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_47cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 47cm1, 550 cwl, 2026-04-17"
+    position_token: "47cm1"
+    distance_cm: 47
+    position_suffix: "1"
+    measurement_date: "2026-04-17"
+    note: "included_in_overlay"
+  - include: true
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_57cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 57cm1, 550 cwl, 2026-04-17"
+    position_token: "57cm1"
+    distance_cm: 57
+    position_suffix: "1"
+    measurement_date: "2026-04-17"
+    note: "included_in_overlay"
+  - include: true
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_67cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 67cm1, 550 cwl, 2026-04-17"
+    position_token: "67cm1"
+    distance_cm: 67
+    position_suffix: "1"
+    measurement_date: "2026-04-17"
+    note: "included_in_overlay"
+  - include: false
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_69cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 69cm, 550 cwl, 2026-04-17"
+    position_token: "69cm"
+    distance_cm: 69
+    position_suffix: ""
+    measurement_date: "2026-04-17"
+    note: "standard_duplicate_or_older_replicate"
+  - include: true
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_69cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 69cm1, 550 cwl, 2026-04-17"
+    position_token: "69cm1"
+    distance_cm: 69
+    position_suffix: "1"
+    measurement_date: "2026-04-17"
+    note: "included_in_overlay"
+  - include: false
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_100cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 100cm, 550 cwl, 2026-04-17"
+    position_token: "100cm"
+    distance_cm: 100
+    position_suffix: ""
+    measurement_date: "2026-04-17"
+    note: "standard_duplicate_or_older_replicate"
+  - include: false
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_100cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 100cm1, 550 cwl, 2026-04-17"
+    position_token: "100cm1"
+    distance_cm: 100
+    position_suffix: "1"
+    measurement_date: "2026-04-17"
+    note: "standard_duplicate_or_older_replicate"
+  - include: false
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_150cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 150cm, 550 cwl, 2026-04-17"
+    position_token: "150cm"
+    distance_cm: 150
+    position_suffix: ""
+    measurement_date: "2026-04-17"
+    note: "standard_duplicate_or_older_replicate"
+  - include: true
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_150cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 150cm1, 550 cwl, 2026-04-17"
+    position_token: "150cm1"
+    distance_cm: 150
+    position_suffix: "1"
+    measurement_date: "2026-04-17"
+    note: "included_in_overlay"
+  - include: false
+    single: false
+    path: "2026 04 17/bcf_1/bcf1_noir_200cm_550cwl_ex360nm_10nJ_100um_i100_background_calc.txt"
+    label: "bcf1_noir, 200cm, 550 cwl, 2026-04-17"
+    position_token: "200cm"
+    distance_cm: 200
+    position_suffix: ""
+    measurement_date: "2026-04-17"
+    note: "background_or_dark_default_off"
+  - include: false
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_200cm_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 200cm, 550 cwl, 2026-04-17"
+    position_token: "200cm"
+    distance_cm: 200
+    position_suffix: ""
+    measurement_date: "2026-04-17"
+    note: "standard_duplicate_or_older_replicate"
+  - include: false
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_200cm1_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 200cm1, 550 cwl, 2026-04-17"
+    position_token: "200cm1"
+    distance_cm: 200
+    position_suffix: "1"
+    measurement_date: "2026-04-17"
+    note: "standard_duplicate_or_older_replicate"
+  - include: true
+    single: true
+    path: "2026 04 17/bcf_1/bcf1_noir_200cm2_550cwl_ex360nm_10nJ_100um_i100_calc.txt"
+    label: "bcf1_noir, 200cm2, 550 cwl, 2026-04-17"
+    position_token: "200cm2"
+    distance_cm: 200
+    position_suffix: "2"
+    measurement_date: "2026-04-17"
+    note: "included_in_overlay"

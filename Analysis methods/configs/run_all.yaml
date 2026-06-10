@@ -1,0 +1,8 @@
+# Reproduction orchestration settings.
+carpets_config: "carpets.yaml"
+it_decay_config: "it_decay_fits_10ns.yaml"
+pl_config_dir: "pl_spectra"
+run_carpets: true
+run_pl_normalized: true
+run_pl_raw: true
+run_it_decay: true

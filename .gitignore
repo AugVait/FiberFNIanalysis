@@ -1,0 +1,20 @@
+# Future root repository: track only reproducible methods and root docs.
+/*
+
+!/.gitignore
+!/README.md
+!/Analysis methods/
+!/Analysis methods/**
+
+# Local Python environments and caches inside the tracked methods folder.
+/Analysis methods/.venv/
+/Analysis methods/.tmp/
+/Analysis methods/.pytest_cache/
+/Analysis methods/**/__pycache__/
+/Analysis methods/**/*.py[cod]
+
+# Generated or machine-local files should stay out of Git even if created nearby.
+/Analysis methods/**/*.png
+/Analysis methods/**/*.pdf
+/Analysis methods/**/*.html
+/Analysis methods/**/*.xlsx
