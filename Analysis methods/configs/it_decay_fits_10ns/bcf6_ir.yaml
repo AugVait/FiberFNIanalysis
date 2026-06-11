@@ -1,0 +1,56 @@
+# Edit include values, then rerun python -m lhcb_fibers_analysis.fit_it_decay.
+# include: true fits the trace and writes its diagnostic PNG/PDF.
+group: "bcf6_ir"
+title: "bcf6_ir"
+traces:
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_100cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf6_ir, 100cm, 10ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "100cm"
+    distance_cm: 100
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -2.19679642
+    delay_max_ns: 10.60121918
+    counts_max: 178.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_150cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf6_ir, 150cm, 10ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "150cm"
+    distance_cm: 150
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -1.94760704
+    delay_max_ns: 10.85040855
+    counts_max: 120.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_37cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf6_ir, 37cm, 10ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "37cm"
+    distance_cm: 37
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -1.27436829
+    delay_max_ns: 11.52364731
+    counts_max: 310.0
+    note: "default_on"

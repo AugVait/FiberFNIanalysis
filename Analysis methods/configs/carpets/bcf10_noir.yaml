@@ -1,0 +1,402 @@
+# Edit include values, then rerun python -m lhcb_fibers_analysis.visualize_carpets.
+# include: true writes an individual quicklook and adds the scan to the contact sheets.
+group: "bcf10_noir"
+title: "bcf10_noir"
+top_edge_crop_rows: 12
+scans:
+  - include: true
+    path: "2026 04 20/bcf_10/bcf10_noir_57cm_ex360nm_10nJ_2ns.img"
+    label: "bcf10_noir, 57cm, 2ns, 2026-04-20"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "57cm"
+    distance_cm: 57
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-04-20"
+    acquisition_date: "4/20/2026"
+    acquisition_time: "2:57:09 PM.326"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/bcf10_noir_57cm_ex360nm_10nJ_10ns.img"
+    label: "bcf10_noir, 57cm, 10ns, 2026-04-20"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "57cm"
+    distance_cm: 57
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-20"
+    acquisition_date: "4/20/2026"
+    acquisition_time: "2:40:44 PM.537"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/bcf10_noir_57cm_ex360nm_10nJ_50ns.img"
+    label: "bcf10_noir, 57cm, 50ns, 2026-04-20"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "57cm"
+    distance_cm: 57
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-04-20"
+    acquisition_date: "4/20/2026"
+    acquisition_time: "2:26:45 PM.558"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/bcf10_noir_77cm_ex360nm_10nJ_10ns.img"
+    label: "bcf10_noir, 77cm, 10ns, 2026-04-20"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "77cm"
+    distance_cm: 77
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-20"
+    acquisition_date: "4/20/2026"
+    acquisition_time: "4:13:13 PM.935"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/bcf10_noir_120cm_ex360nm_10nJ_10ns.img"
+    label: "bcf10_noir, 120cm, 10ns, 2026-04-20"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "120cm"
+    distance_cm: 120
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-20"
+    acquisition_date: "4/20/2026"
+    acquisition_time: "3:57:31 PM.309"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/bcf10_noir_160cm_ex360nm_10nJ_2ns.img"
+    label: "bcf10_noir, 160cm, 2ns, 2026-04-20"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "160cm"
+    distance_cm: 160
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-04-20"
+    acquisition_date: "4/20/2026"
+    acquisition_time: "3:21:30 PM.650"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/bcf10_noir_160cm_ex360nm_10nJ_10ns.img"
+    label: "bcf10_noir, 160cm, 10ns, 2026-04-20"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "160cm"
+    distance_cm: 160
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-20"
+    acquisition_date: "4/20/2026"
+    acquisition_time: "3:38:16 PM.408"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/bcf10_noir_160cm_ex360nm_10nJ_50ns.img"
+    label: "bcf10_noir, 160cm, 50ns, 2026-04-20"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "160cm"
+    distance_cm: 160
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-04-20"
+    acquisition_date: "4/20/2026"
+    acquisition_time: "3:50:56 PM.670"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/bcf10_noir_190cm_ex360nm_10nJ_10ns.img"
+    label: "bcf10_noir, 190cm, 10ns, 2026-04-20"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "190cm"
+    distance_cm: 190
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-20"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "10:08:08 AM.211"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf10_noir_37cm_ex360nm_10nJ_2ns.img"
+    label: "bcf10_noir, 37cm, 2ns, 2026-05-05"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "37cm"
+    distance_cm: 37
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "12:29:16 PM.388"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf10_noir_37cm_ex360nm_10nJ_10ns.img"
+    label: "bcf10_noir, 37cm, 10ns, 2026-05-05"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "37cm"
+    distance_cm: 37
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "12:46:14 PM.242"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf10_noir_37cm_ex360nm_10nJ_50ns.img"
+    label: "bcf10_noir, 37cm, 50ns, 2026-05-05"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "37cm"
+    distance_cm: 37
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "1:04:21 PM.052"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf10_noir_100cm_ex360nm_10nJ_2ns.img"
+    label: "bcf10_noir, 100cm, 2ns, 2026-05-05"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "100cm"
+    distance_cm: 100
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "1:59:59 PM.195"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf10_noir_100cm_ex360nm_10nJ_10ns.img"
+    label: "bcf10_noir, 100cm, 10ns, 2026-05-05"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "100cm"
+    distance_cm: 100
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "1:43:16 PM.332"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf10_noir_100cm_ex360nm_10nJ_50ns.img"
+    label: "bcf10_noir, 100cm, 50ns, 2026-05-05"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "100cm"
+    distance_cm: 100
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "1:26:20 PM.396"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf10_noir_200cm_ex360nm_10nJ_2ns.img"
+    label: "bcf10_noir, 200cm, 2ns, 2026-05-05"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "200cm"
+    distance_cm: 200
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "2:18:32 PM.107"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf10_noir_200cm_ex360nm_10nJ_10ns.img"
+    label: "bcf10_noir, 200cm, 10ns, 2026-05-05"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "200cm"
+    distance_cm: 200
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "2:39:32 PM.571"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf10_noir_200cm_ex360nm_10nJ_50ns.img"
+    label: "bcf10_noir, 200cm, 50ns, 2026-05-05"
+    sample: "bcf10"
+    irradiation: "noir"
+    position_token: "200cm"
+    distance_cm: 200
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "2:56:30 PM.763"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "default_on"

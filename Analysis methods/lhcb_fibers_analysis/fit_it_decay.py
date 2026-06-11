@@ -18,7 +18,29 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
 
-from .paths import DEFAULT_IT_DECAY_CONFIG, DEFAULT_RAW_DIR, DEFAULT_RESULTS_DIR, resolve_path
+from .fiber_names import FiberNameMap, read_fiber_name_map
+from .paths import (
+    DEFAULT_FIBER_NAMES_CONFIG,
+    DEFAULT_IT_DECAY_CONFIG,
+    DEFAULT_RAW_DIR,
+    DEFAULT_RESULTS_DIR,
+    resolve_path,
+)
+from .plot_style import (
+    COLORS,
+    DOUBLE_COLUMN_WIDE,
+    apply_axes_style,
+    save_figure,
+    set_publication_style,
+)
+from .scan_config import (
+    SectionConfig,
+    configs_exist,
+    normalize_config_path,
+    read_section_configs,
+    relative_config_dir,
+    yaml_scalar,
+)
 from .yaml_config import float_value, int_value, read_yaml_mapping, string_value
 
 
@@ -28,6 +50,7 @@ DEFAULT_TIME_WINDOW = "10ns"
 @dataclass(frozen=True)
 class FitConfig:
     out_subdir: str = "it_decay_fits_10ns"
+    trace_config_dir: str = "it_decay_fits_10ns"
     time_window: str = DEFAULT_TIME_WINDOW
     smooth_sigma: float = 2.0
     min_points: int = 30
@@ -41,6 +64,7 @@ class FitConfig:
 
 
 def read_fit_config(path: Path) -> FitConfig:
+    """Read integrated-time decay fitting settings from YAML."""
     values = read_yaml_mapping(path)
     tau_min = float_value(values, "fit_tau_min_ns", 0.03)
     tau_max = float_value(values, "fit_tau_max_ns", 50.0)
@@ -48,6 +72,7 @@ def read_fit_config(path: Path) -> FitConfig:
         raise ValueError(f"fit_tau_max_ns must be greater than fit_tau_min_ns in {path}")
     return FitConfig(
         out_subdir=string_value(values, "out_subdir", "it_decay_fits_10ns"),
+        trace_config_dir=string_value(values, "trace_config_dir", "it_decay_fits_10ns"),
         time_window=string_value(values, "time_window", DEFAULT_TIME_WINDOW),
         smooth_sigma=float_value(values, "smooth_sigma", 2.0),
         min_points=max(1, int_value(values, "min_points", 30)),
@@ -76,13 +101,63 @@ class TraceInfo:
     relative_path: Path
     sample: str
     position: str
+    distance_cm: int | None
+    position_suffix: str
     excitation: str
+    excitation_nm: int | None
     energy: str
+    energy_nj: int | None
     window: str
     wavelength_label: str
+    measurement_date: str
+
+
+def position_parts(position: str) -> tuple[int | None, str]:
+    """Split a position token into numeric distance and suffix."""
+    match = re.match(r"(?P<distance>\d+)cm(?P<suffix>.*)$", position, flags=re.IGNORECASE)
+    if not match:
+        return None, ""
+    return int(match.group("distance")), match.group("suffix")
+
+
+def numeric_token(text: str) -> int | None:
+    """Extract the first integer token from text."""
+    match = re.search(r"(\d+)", text)
+    return int(match.group(1)) if match else None
+
+
+def numeric_float(text: str) -> float | None:
+    """Convert text to a float when possible."""
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def measurement_date(path: Path, root: Path) -> str:
+    """Extract the measurement date for an IT trace path."""
+    for part in path.relative_to(root).parts:
+        if re.fullmatch(r"20\d{2} \d{2} \d{2}", part):
+            return part.replace(" ", "-", 1).replace(" ", "-", 1)
+    return ""
+
+
+def spaced_units(text: str) -> str:
+    """Insert a space between numeric values and unit suffixes."""
+    return re.sub(r"(?<=\d)(?=[A-Za-z])", " ", text)
+
+
+def trace_title(info: TraceInfo, fiber_names: FiberNameMap) -> str:
+    """Build the display title for an integrated-time decay trace."""
+    wavelength = f"{info.wavelength_label} nm" if info.wavelength_label else "unknown wavelength"
+    return (
+        f"{fiber_names.real_name(info.sample)}, {spaced_units(info.position)}, IT {spaced_units(info.window)} "
+        f"({wavelength}, ex {spaced_units(info.excitation)}, {spaced_units(info.energy)})"
+    )
 
 
 def natural_position_key(position: str) -> tuple[float, str]:
+    """Return a sortable key for fiber position tokens."""
     if position == "ENDcm":
         return (math.inf, position)
     match = re.match(r"(?P<distance>\d+)cm(?P<suffix>.*)$", position)
@@ -92,6 +167,7 @@ def natural_position_key(position: str) -> tuple[float, str]:
 
 
 def discover_traces(raw_dir: Path, time_window: str) -> list[TraceInfo]:
+    """Find integrated-time traces matching the requested time window."""
     traces: list[TraceInfo] = []
     for path in sorted(raw_dir.rglob(f"IT_*_{time_window}.dat")):
         match = FILENAME_RE.match(path.name)
@@ -106,22 +182,29 @@ def discover_traces(raw_dir: Path, time_window: str) -> list[TraceInfo]:
             fields = first_two[1].split("\t")
             if len(fields) > 1:
                 wavelength_label = fields[1]
+        distance_cm, position_suffix = position_parts(parts["position"])
         traces.append(
             TraceInfo(
                 path=path,
                 relative_path=path.relative_to(raw_dir),
                 sample=parts["sample"],
                 position=parts["position"],
+                distance_cm=distance_cm,
+                position_suffix=position_suffix,
                 excitation=parts["excitation"],
+                excitation_nm=numeric_token(parts["excitation"]),
                 energy=parts["energy"],
+                energy_nj=numeric_token(parts["energy"]),
                 window=parts["window"],
                 wavelength_label=wavelength_label,
+                measurement_date=measurement_date(path, raw_dir),
             )
         )
     return traces
 
 
 def read_trace(path: Path) -> pd.DataFrame:
+    """Load an integrated-time trace data file into a DataFrame."""
     return pd.read_csv(
         path,
         sep="\t",
@@ -131,11 +214,97 @@ def read_trace(path: Path) -> pd.DataFrame:
     ).dropna()
 
 
+def trace_label(info: TraceInfo) -> str:
+    """Build a metadata label for a trace config entry."""
+    parts = [info.sample, info.position, info.window]
+    if info.wavelength_label:
+        parts.append(f"{info.wavelength_label} nm")
+    if info.measurement_date:
+        parts.append(info.measurement_date)
+    return ", ".join(parts)
+
+
+def trace_note(info: TraceInfo) -> str:
+    """Classify a trace for selection-config notes."""
+    if info.position.upper() == "ENDcm":
+        return "endpoint_condition"
+    if info.position_suffix:
+        return "replicate_or_reverse_orientation"
+    return "default_on"
+
+
+def write_trace_configs(traces: list[TraceInfo], config_dir: Path) -> None:
+    """Write per-sample YAML configs for discovered IT traces."""
+    config_dir.mkdir(parents=True, exist_ok=True)
+    for sample in sorted({trace.sample for trace in traces}):
+        sample_traces = [trace for trace in traces if trace.sample == sample]
+        lines = [
+            "# Edit include values, then rerun python -m lhcb_fibers_analysis.fit_it_decay.",
+            "# include: true fits the trace and writes its diagnostic PNG/PDF.",
+            f"group: {yaml_scalar(sample)}",
+            f"title: {yaml_scalar(sample)}",
+            "traces:",
+        ]
+        for trace in sample_traces:
+            df = read_trace(trace.path)
+            delay = df["delay_ns"].to_numpy(dtype=float)
+            counts = df["counts"].to_numpy(dtype=float)
+            wavelength_nm = numeric_float(trace.wavelength_label)
+            lines.extend(
+                [
+                    f"  - include: {yaml_scalar(True)}",
+                    f"    path: {yaml_scalar(trace.relative_path.as_posix())}",
+                    f"    label: {yaml_scalar(trace_label(trace))}",
+                    f"    sample: {yaml_scalar(trace.sample)}",
+                    f"    position: {yaml_scalar(trace.position)}",
+                    f"    distance_cm: {yaml_scalar(trace.distance_cm if trace.distance_cm is not None else '')}",
+                    f"    position_suffix: {yaml_scalar(trace.position_suffix)}",
+                    f"    excitation_nm: {yaml_scalar(trace.excitation_nm if trace.excitation_nm is not None else '')}",
+                    f"    pulse_energy_nj: {yaml_scalar(trace.energy_nj if trace.energy_nj is not None else '')}",
+                    f"    time_window: {yaml_scalar(trace.window)}",
+                    f"    wavelength_label_nm: {yaml_scalar(wavelength_nm if wavelength_nm is not None else trace.wavelength_label)}",
+                    f"    measurement_date: {yaml_scalar(trace.measurement_date)}",
+                    f"    points: {yaml_scalar(len(df))}",
+                    f"    delay_min_ns: {yaml_scalar(float(np.nanmin(delay)) if delay.size else '')}",
+                    f"    delay_max_ns: {yaml_scalar(float(np.nanmax(delay)) if delay.size else '')}",
+                    f"    counts_max: {yaml_scalar(float(np.nanmax(counts)) if counts.size else '')}",
+                    f"    note: {yaml_scalar(trace_note(trace))}",
+                ]
+            )
+        (config_dir / f"{sample}.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def selected_traces_from_configs(
+    configs: list[SectionConfig],
+    traces_by_path: dict[str, TraceInfo],
+) -> tuple[list[TraceInfo], set[Path], set[Path]]:
+    """Resolve selected IT traces from YAML config entries."""
+    configured_paths: set[Path] = set()
+    selected_paths: set[Path] = set()
+    selected: list[TraceInfo] = []
+
+    for config in configs:
+        for entry in config.entries:
+            rel_path = normalize_config_path(str(entry.get("path", "")))
+            trace = traces_by_path.get(rel_path)
+            if trace is None:
+                print(f"warning: IT trace config path not found, skipping: {rel_path}")
+                continue
+            configured_paths.add(trace.relative_path)
+            if bool(entry.get("include", False)):
+                selected.append(trace)
+                selected_paths.add(trace.relative_path)
+
+    return sorted(selected, key=lambda trace: (trace.sample, natural_position_key(trace.position), trace.relative_path.as_posix())), selected_paths, configured_paths
+
+
 def exp_decay(x: np.ndarray, amplitude: float, tau_ns: float, baseline: float, x0: float) -> np.ndarray:
+    """Evaluate a single-exponential decay with a constant baseline."""
     return amplitude * np.exp(-(x - x0) / tau_ns) + baseline
 
 
 def robust_noise(values: np.ndarray) -> float:
+    """Estimate noise using a median absolute deviation fallback."""
     if values.size == 0:
         return 0.0
     median = float(np.median(values))
@@ -146,6 +315,7 @@ def robust_noise(values: np.ndarray) -> float:
 
 
 def first_sustained_true(mask: np.ndarray, run_length: int) -> int | None:
+    """Return the first index where a boolean mask stays true for a run."""
     if mask.size < run_length:
         return None
     run = 0
@@ -156,12 +326,19 @@ def first_sustained_true(mask: np.ndarray, run_length: int) -> int | None:
     return None
 
 
-def fit_trace(info: TraceInfo, df: pd.DataFrame, config: FitConfig) -> dict[str, object]:
+def fit_trace(
+    info: TraceInfo,
+    df: pd.DataFrame,
+    config: FitConfig,
+    fiber_names: FiberNameMap,
+) -> dict[str, object]:
+    """Fit one integrated-time trace or return a skipped result."""
     x = df["delay_ns"].to_numpy(dtype=float)
     y = df["counts"].to_numpy(dtype=float)
     n = len(y)
     result: dict[str, object] = {
         "sample": info.sample,
+        "fiber_name": fiber_names.real_name(info.sample),
         "position": info.position,
         "excitation": info.excitation,
         "energy": info.energy,
@@ -321,7 +498,9 @@ def plot_trace(
     plots_root: Path,
     out_root: Path,
     config: FitConfig,
+    fiber_names: FiberNameMap,
 ) -> tuple[str, str]:
+    """Write PNG and PDF diagnostics for one trace fit."""
     sample_dir = plots_root / info.sample
     sample_dir.mkdir(parents=True, exist_ok=True)
     stem = info.path.stem
@@ -333,31 +512,23 @@ def plot_trace(
     smooth = gaussian_filter1d(y, sigma=config.smooth_sigma)
     y_scale = max(float(np.max(y)), 1.0)
 
-    plt.rcParams.update(
-        {
-            "font.family": "serif",
-            "font.size": 10,
-            "mathtext.fontset": "dejavuserif",
-            "axes.linewidth": 0.8,
-        }
-    )
+    set_publication_style()
     fig, (ax, ax_res) = plt.subplots(
         2,
         1,
-        figsize=(6.6, 4.8),
-        dpi=220,
+        figsize=DOUBLE_COLUMN_WIDE,
         sharex=True,
         constrained_layout=True,
         gridspec_kw={"height_ratios": [3.0, 1.0], "hspace": 0.08},
     )
 
-    ax.plot(x, y / y_scale, "o", ms=2.6, color="#222222", alpha=0.80, label="IT data")
-    ax.plot(x, smooth / y_scale, "-", lw=1.2, color="#6B7280", label="smoothed")
+    ax.plot(x, y / y_scale, "o", ms=2.2, color=COLORS["black"], alpha=0.70, label="IT data")
+    ax.plot(x, smooth / y_scale, "-", lw=1.05, color=COLORS["gray"], label="smoothed")
     ax.axvline(
         float(result.get("primary_peak_delay_ns", x[int(np.argmax(y))])),
         lw=0.9,
         ls=":",
-        color="#1F77B4",
+        color=COLORS["blue"],
         label="dominant peak",
     )
 
@@ -372,9 +543,9 @@ def plot_trace(
             x[peak_idx],
             y[peak_idx] / y_scale,
             "x",
-            ms=6,
+            ms=5.2,
             mew=1.2,
-            color="#D62728",
+            color=COLORS["vermillion"],
             label="detected peak" if not peak_label_used else "_nolegend_",
         )
         peak_label_used = True
@@ -400,9 +571,9 @@ def plot_trace(
             float(result["baseline_counts"]),
             fit_start,
         )
-        ax.axvspan(fit_start, fit_end, color="#D62728", alpha=0.08, lw=0, label="_nolegend_")
-        ax.plot(x_dense, y_dense / y_scale, "-", lw=1.8, color="#D62728", label="single-exponential fit")
-        ax_res.plot(x_fit, (y_fit - y_pred) / y_scale, "o", ms=2.6, color="#222222", alpha=0.80)
+        ax.axvspan(fit_start, fit_end, color=COLORS["vermillion"], alpha=0.08, lw=0, label="_nolegend_")
+        ax.plot(x_dense, y_dense / y_scale, "-", lw=1.45, color=COLORS["vermillion"], label="single-exponential fit")
+        ax_res.plot(x_fit, (y_fit - y_pred) / y_scale, "o", ms=2.2, color=COLORS["black"], alpha=0.70)
         annotation = (
             rf"$\tau$ = {float(result['tau_ns']):.3g} $\pm$ {float(result['tau_se_ns']):.2g} ns"
             "\n"
@@ -411,8 +582,8 @@ def plot_trace(
             f"fit points = {int(result['fit_points'])}"
         )
     else:
-        ax_res.plot(x, np.zeros_like(x), "-", lw=0.8, color="#9CA3AF")
-        annotation = f"Skipped: {result.get('skip_reason', '')}"
+        ax_res.plot(x, np.zeros_like(x), "-", lw=0.8, color=COLORS["gray"])
+        annotation = f"Skipped: {str(result.get('skip_reason', '')).replace('_', ' ')}"
 
     ax.text(
         0.98,
@@ -421,28 +592,31 @@ def plot_trace(
         transform=ax.transAxes,
         va="top",
         ha="right",
-        bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#D1D5DB", "alpha": 0.92},
+        fontsize=8.0,
+        bbox={"boxstyle": "square,pad=0.25", "facecolor": "white", "edgecolor": "#C9CED6", "alpha": 0.92},
     )
-    ax.set_ylabel("Normalized intensity")
-    ax.set_title(
-        f"{info.sample}, {info.position}, IT {info.window}"
-        f" ({info.wavelength_label} nm, ex {info.excitation}, {info.energy})",
-        fontsize=12,
-        pad=8,
+    ax.set_ylabel("Normalized intensity (a.u.)")
+    ax.set_title(trace_title(info, fiber_names), pad=5)
+    legend = ax.legend(
+        loc="lower left",
+        frameon=True,
+        framealpha=0.88,
+        facecolor="white",
+        edgecolor="#C9CED6",
+        handlelength=1.7,
+        borderpad=0.35,
+        labelspacing=0.35,
     )
-    ax.legend(frameon=True, loc="lower left", fontsize=8, framealpha=0.90, edgecolor="#D1D5DB")
-    ax.grid(True, color="#E5E7EB", lw=0.6)
+    legend.get_frame().set_linewidth(0.8)
+    apply_axes_style(ax, grid=True)
 
-    ax_res.axhline(0, color="#6B7280", lw=0.8)
+    ax_res.axhline(0, color=COLORS["gray"], lw=0.8)
     ax_res.set_xlabel("Delay (ns)")
-    ax_res.set_ylabel("Residual")
-    ax_res.grid(True, color="#E5E7EB", lw=0.6)
-    for spine in ["top", "right"]:
-        ax.spines[spine].set_visible(False)
-        ax_res.spines[spine].set_visible(False)
+    ax_res.set_ylabel("Residual (a.u.)")
+    apply_axes_style(ax_res, grid=True)
 
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
+    save_figure(fig, png_path)
+    save_figure(fig, pdf_path)
     plt.close(fig)
     return (
         Path(os.path.relpath(png_path, out_root)).as_posix(),
@@ -451,6 +625,7 @@ def plot_trace(
 
 
 def write_csv(path: Path, rows: list[dict[str, object]], fieldnames: list[str]) -> None:
+    """Write dictionaries to a CSV file with a fixed field order."""
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
@@ -458,15 +633,16 @@ def write_csv(path: Path, rows: list[dict[str, object]], fieldnames: list[str]) 
 
 
 def build_matrices(results: list[dict[str, object]]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    samples = sorted({str(row["sample"]) for row in results})
+    """Build decay-time and status matrices from fit results."""
+    samples = sorted({str(row.get("fiber_name", row["sample"])) for row in results})
     positions = sorted({str(row["position"]) for row in results}, key=natural_position_key)
     tau_matrix = pd.DataFrame(index=samples, columns=positions, dtype=object)
     status_matrix = pd.DataFrame(index=samples, columns=positions, dtype=object)
-    tau_matrix.index.name = "sample"
-    status_matrix.index.name = "sample"
+    tau_matrix.index.name = "fiber_name"
+    status_matrix.index.name = "fiber_name"
 
     for row in results:
-        sample = str(row["sample"])
+        sample = str(row.get("fiber_name", row["sample"]))
         position = str(row["position"])
         if row.get("status") == "fit":
             tau_matrix.loc[sample, position] = float(row["tau_ns"])
@@ -487,6 +663,7 @@ def build_matrices(results: list[dict[str, object]]) -> tuple[pd.DataFrame, pd.D
 
 
 def write_method_note(path: Path, results: list[dict[str, object]], time_window: str) -> None:
+    """Write the method summary README for IT decay fits."""
     fit_count = sum(1 for row in results if row.get("status") == "fit")
     skip_count = len(results) - fit_count
     method = f"""# IT 10 ns Decay Fits
@@ -512,38 +689,63 @@ Summary: {fit_count} fitted, {skip_count} skipped, {len(results)} total {time_wi
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Run the integrated-time decay fitting command-line interface."""
     parser = argparse.ArgumentParser(description="Fit single-exponential decays for IT_*.dat traces.")
     parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
     parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
     parser.add_argument("--config", type=Path, default=DEFAULT_IT_DECAY_CONFIG)
+    parser.add_argument("--trace-config-dir", type=Path, default=None)
+    parser.add_argument("--fiber-names-config", type=Path, default=DEFAULT_FIBER_NAMES_CONFIG)
     parser.add_argument("--out-subdir", type=Path, default=None)
     parser.add_argument("--time-window", default=None)
+    parser.add_argument("--refresh-configs", action="store_true", help="Rewrite per-sample IT trace configs.")
     args = parser.parse_args(argv)
 
     raw_dir = resolve_path(args.raw_dir)
     results_dir = resolve_path(args.results_dir)
-    config = read_fit_config(resolve_path(args.config))
+    config_path = resolve_path(args.config)
+    fiber_names_config = resolve_path(args.fiber_names_config)
+    fiber_names = read_fiber_name_map(fiber_names_config)
+    config = read_fit_config(config_path)
+    trace_config_dir = (
+        resolve_path(args.trace_config_dir)
+        if args.trace_config_dir is not None
+        else relative_config_dir(config_path, config.trace_config_dir)
+    )
     out_subdir = args.out_subdir or Path(config.out_subdir)
     time_window = args.time_window or config.time_window
     out_root = (results_dir / out_subdir).resolve()
     plots_root = out_root / "plots"
     plots_root.mkdir(parents=True, exist_ok=True)
 
-    traces = discover_traces(raw_dir, time_window)
-    if not traces:
+    discovered_traces = discover_traces(raw_dir, time_window)
+    if not discovered_traces:
         raise SystemExit(f"No IT_*_{time_window}.dat files found under {raw_dir}")
+
+    if args.refresh_configs or not configs_exist(trace_config_dir):
+        write_trace_configs(discovered_traces, trace_config_dir)
+
+    trace_configs = read_section_configs(trace_config_dir, "traces")
+    if not trace_configs:
+        raise SystemExit(f"No IT trace YAML configs found in {trace_config_dir}")
+
+    traces_by_path = {trace.relative_path.as_posix(): trace for trace in discovered_traces}
+    traces, selected_trace_paths, configured_trace_paths = selected_traces_from_configs(trace_configs, traces_by_path)
+    if not traces:
+        raise SystemExit(f"No IT traces are selected in {trace_config_dir}")
 
     results: list[dict[str, object]] = []
     for info in traces:
         df = read_trace(info.path)
-        result = fit_trace(info, df, config)
-        png_path, pdf_path = plot_trace(info, df, result, plots_root, out_root, config)
+        result = fit_trace(info, df, config, fiber_names)
+        png_path, pdf_path = plot_trace(info, df, result, plots_root, out_root, config, fiber_names)
         result["plot_png"] = png_path
         result["plot_pdf"] = pdf_path
         results.append(result)
 
     fields = [
         "sample",
+        "fiber_name",
         "position",
         "excitation",
         "energy",
@@ -585,9 +787,12 @@ def main(argv: list[str] | None = None) -> None:
     write_method_note(out_root / "README.md", results, time_window)
 
     fit_count = sum(1 for row in results if row.get("status") == "fit")
+    print(f"Configured {len(configured_trace_paths)} IT {time_window} traces; selected {len(selected_trace_paths)}.")
     print(f"Processed {len(results)} IT {time_window} traces: {fit_count} fit, {len(results) - fit_count} skipped.")
     print(f"Output: {out_root}")
-    print(f"config: {resolve_path(args.config)}")
+    print(f"config: {config_path}")
+    print(f"fiber names: {fiber_names_config}")
+    print(f"trace configs: {trace_config_dir}")
 
 
 if __name__ == "__main__":

@@ -16,7 +16,22 @@ import numpy as np
 import pandas as pd
 from matplotlib import colors
 
-from .paths import DEFAULT_CONFIG_DIR, DEFAULT_RAW_DIR, DEFAULT_RESULTS_DIR, resolve_path
+from .fiber_names import FiberNameMap, read_fiber_name_map
+from .paths import (
+    DEFAULT_CONFIG_DIR,
+    DEFAULT_FIBER_NAMES_CONFIG,
+    DEFAULT_RAW_DIR,
+    DEFAULT_RESULTS_DIR,
+    resolve_path,
+)
+from .plot_style import (
+    SEQUENTIAL_CMAP,
+    SINGLE_COLUMN_SQUARE,
+    apply_axes_style,
+    save_figure,
+    set_publication_style,
+    style_colorbar,
+)
 
 SPECTRAL_XLIM_NM = (400, 720)
 INTENSITY_MODES = ("normalized", "raw")
@@ -55,21 +70,25 @@ class PLSpectrum:
 
 
 def _match(text: str, pattern: str) -> str:
+    """Return the first regex capture group from text, if present."""
     match = re.search(pattern, text, flags=re.IGNORECASE)
     return match.group(1) if match else ""
 
 
 def _match_int(text: str, pattern: str) -> int | None:
+    """Return the first regex capture group converted to an integer."""
     value = _match(text, pattern)
     return int(value) if value else None
 
 
 def _match_float(text: str, pattern: str) -> float | None:
+    """Return the first regex capture group converted to a float."""
     value = _match(text, pattern)
     return float(value) if value else None
 
 
 def parse_filename(path: Path) -> dict[str, object]:
+    """Extract PL spectrum metadata from a raw-data filename."""
     stem = path.stem.lower()
     if stem.endswith("_calc"):
         stem = stem[:-5]
@@ -99,6 +118,7 @@ def parse_filename(path: Path) -> dict[str, object]:
 
 
 def measurement_date(path: Path, root: Path) -> str:
+    """Extract the measurement date for a PL spectrum path."""
     for part in path.relative_to(root).parts:
         if re.fullmatch(r"20\d{2} \d{2} \d{2}", part):
             return part.replace(" ", "-", 1).replace(" ", "-", 1)
@@ -106,6 +126,7 @@ def measurement_date(path: Path, root: Path) -> str:
 
 
 def safe_output_stem(path: Path, root: Path) -> str:
+    """Build a unique safe output stem for a raw-data path."""
     stem = path.stem
     if stem.lower().endswith("_calc"):
         stem = stem[:-5]
@@ -115,11 +136,13 @@ def safe_output_stem(path: Path, root: Path) -> str:
 
 
 def yaml_quote(value: object) -> str:
+    """Quote a value for the small YAML files used by the analyses."""
     text = "" if value is None else str(value)
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def yaml_scalar(value: object) -> str:
+    """Format a scalar value for the small YAML config files."""
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -128,6 +151,7 @@ def yaml_scalar(value: object) -> str:
 
 
 def parse_yaml_scalar(value: str) -> object:
+    """Parse a scalar value from the small YAML config format."""
     text = value.strip()
     if text.lower() == "true":
         return True
@@ -150,6 +174,7 @@ def parse_yaml_scalar(value: str) -> object:
 
 
 def read_plot_config(path: Path) -> PlotConfig:
+    """Read one PL spectrum plotting config file."""
     top: dict[str, object] = {}
     spectra: list[dict[str, object]] = []
     current: dict[str, object] | None = None
@@ -200,16 +225,18 @@ def read_plot_config(path: Path) -> PlotConfig:
         group=group,
         title=str(top.get("title", group)),
         xlim_nm=(x_min, x_max),
-        colormap=str(top.get("colormap", "brg")),
+        colormap=str(top.get("colormap", SEQUENTIAL_CMAP)),
         spectra=spectra,
     )
 
 
 def read_plot_configs(config_dir: Path) -> list[PlotConfig]:
+    """Read all PL spectrum plotting configs in a directory."""
     return [read_plot_config(path) for path in sorted(config_dir.glob("*.yaml"))]
 
 
 def find_column(columns: list[str], predicate) -> str | None:
+    """Return the first column name matching a predicate."""
     for column in columns:
         if predicate(column.strip().lower()):
             return column
@@ -217,6 +244,7 @@ def find_column(columns: list[str], predicate) -> str | None:
 
 
 def read_calc_spectrum(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Read wavelength and intensity arrays from a converted spectrum."""
     data = pd.read_csv(path, sep="\t", engine="python")
     columns = list(data.columns)
     wavelength_col = find_column(columns, lambda text: text.startswith("wavelength"))
@@ -237,6 +265,7 @@ def read_calc_spectrum(path: Path) -> tuple[np.ndarray, np.ndarray]:
 
 
 def normalized(intensity: np.ndarray) -> np.ndarray:
+    """Normalize an intensity array to its finite maximum."""
     max_intensity = float(np.nanmax(intensity))
     if not np.isfinite(max_intensity) or max_intensity == 0:
         max_intensity = float(np.nanmax(np.abs(intensity)))
@@ -246,6 +275,7 @@ def normalized(intensity: np.ndarray) -> np.ndarray:
 
 
 def sort_key(record: PLSpectrum) -> tuple:
+    """Return a stable sort key for measurement records."""
     position = -1 if record.position_token == "endcm" else record.distance_cm if record.distance_cm is not None else 9999
     suffix = record.position_suffix or "0"
     return (
@@ -260,6 +290,7 @@ def sort_key(record: PLSpectrum) -> tuple:
 
 
 def nominal_position(record: PLSpectrum) -> str:
+    """Return the canonical position token for a spectrum record."""
     if record.position_token == "endcm":
         return "endcm"
     if record.distance_cm is not None:
@@ -268,6 +299,7 @@ def nominal_position(record: PLSpectrum) -> str:
 
 
 def suffix_rank(position_suffix: str) -> tuple[int, int | str]:
+    """Rank position suffixes for replicate selection."""
     if not position_suffix:
         return (0, 0)
     if position_suffix.isdigit():
@@ -276,6 +308,7 @@ def suffix_rank(position_suffix: str) -> tuple[int, int | str]:
 
 
 def representative_score(record: PLSpectrum) -> tuple:
+    """Score a spectrum record for representative overlay selection."""
     return (
         suffix_rank(record.position_suffix),
         record.measurement_date,
@@ -286,6 +319,7 @@ def representative_score(record: PLSpectrum) -> tuple:
 
 
 def select_overlay_records(records: list[PLSpectrum], *, deduplicate_positions: bool = True) -> list[PLSpectrum]:
+    """Select records to include in PL overlay plots."""
     if not deduplicate_positions:
         return records
 
@@ -298,8 +332,10 @@ def select_overlay_records(records: list[PLSpectrum], *, deduplicate_positions: 
     return sorted(selected.values(), key=sort_key)
 
 
-def label(record: PLSpectrum) -> str:
-    parts = [record.group]
+def label(record: PLSpectrum, fiber_names: FiberNameMap | None = None) -> str:
+    """Build a display label for a measurement record."""
+    group = fiber_names.real_name(record.group) if fiber_names is not None else record.group
+    parts = [group]
     if record.position_token:
         parts.append(record.position_token)
     if record.cwl_nm is not None:
@@ -309,35 +345,13 @@ def label(record: PLSpectrum) -> str:
     return ", ".join(parts)
 
 
-def set_publication_style() -> None:
-    plt.rcParams.update(
-        {
-            "figure.dpi": 160,
-            "savefig.dpi": 400,
-            "font.family": "serif",
-            "font.size": 8.5,
-            "axes.linewidth": 0.8,
-            "axes.labelsize": 9,
-            "xtick.labelsize": 8,
-            "ytick.labelsize": 8,
-            "xtick.direction": "in",
-            "ytick.direction": "in",
-            "xtick.major.size": 3.5,
-            "ytick.major.size": 3.5,
-            "xtick.minor.size": 2,
-            "ytick.minor.size": 2,
-            "legend.frameon": False,
-            "pdf.fonttype": 42,
-            "ps.fonttype": 42,
-        }
-    )
-
-
 def output_base_path(out_dir: Path) -> Path:
+    """Return the base directory used for generated outputs."""
     return out_dir
 
 
 def intensity_values(record: PLSpectrum, intensity_mode: str) -> np.ndarray:
+    """Return the intensity array for the selected plotting mode."""
     if intensity_mode == "normalized":
         return record.normalized_intensity
     if intensity_mode == "raw":
@@ -346,41 +360,50 @@ def intensity_values(record: PLSpectrum, intensity_mode: str) -> np.ndarray:
 
 
 def y_axis_label(intensity_mode: str) -> str:
+    """Return the y-axis label for an intensity plotting mode."""
     if intensity_mode == "normalized":
         return "Normalized PL intensity (a.u.)"
     return "PL intensity (arb. u.)"
 
 
 def intensity_mode_title(intensity_mode: str) -> str:
+    """Return the report title for an intensity plotting mode."""
     if intensity_mode == "normalized":
         return "Normalized PL Spectra"
     return "Raw PL Spectra"
 
 
 def overlay_name_suffix(intensity_mode: str) -> str:
+    """Return the output filename suffix for an intensity mode."""
     if intensity_mode == "normalized":
         return "normalized"
     return "raw_intensity"
 
 
 def apply_y_axis_style(ax, intensity_mode: str) -> None:
+    """Apply y-axis formatting for the intensity plotting mode."""
     if intensity_mode == "normalized":
         ax.set_ylim(-0.03, 1.06)
     else:
         ax.ticklabel_format(axis="y", style="sci", scilimits=(-2, 3))
 
 
-def plot_single(record: PLSpectrum, intensity_mode: str, xlim_nm: tuple[float, float]) -> None:
-    fig, ax = plt.subplots(figsize=(3.35, 3.35), constrained_layout=True)
-    ax.plot(record.wavelength_nm, intensity_values(record, intensity_mode), color="black", linewidth=1.05)
+def plot_single(
+    record: PLSpectrum,
+    intensity_mode: str,
+    xlim_nm: tuple[float, float],
+    fiber_names: FiberNameMap,
+) -> None:
+    """Save an individual PL spectrum plot."""
+    fig, ax = plt.subplots(figsize=SINGLE_COLUMN_SQUARE, constrained_layout=True)
+    ax.plot(record.wavelength_nm, intensity_values(record, intensity_mode), color="black", linewidth=1.0)
     ax.set_xlabel("Wavelength (nm)")
     ax.set_ylabel(y_axis_label(intensity_mode))
     ax.set_xlim(*xlim_nm)
     apply_y_axis_style(ax, intensity_mode)
-    ax.minorticks_on()
-    ax.text(0.97, 0.96, label(record), transform=ax.transAxes, va="top", ha="right", fontsize=7.2)
-    record.out_png.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(record.out_png)
+    apply_axes_style(ax)
+    ax.text(0.97, 0.96, label(record, fiber_names), transform=ax.transAxes, va="top", ha="right", fontsize=7.2)
+    save_figure(fig, record.out_png)
     plt.close(fig)
 
 
@@ -393,6 +416,7 @@ def plot_overlay(
     xlim_nm: tuple[float, float],
     colormap: str,
 ) -> None:
+    """Save a combined PL spectrum overlay plot."""
     if not records:
         return
 
@@ -404,7 +428,7 @@ def plot_overlay(
     norm = colors.Normalize(vmin=vmin, vmax=vmax)
     cmap = matplotlib.colormaps[colormap]
 
-    fig, ax = plt.subplots(figsize=(3.75, 3.75), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=SINGLE_COLUMN_SQUARE, constrained_layout=True)
     for record in records:
         if record.distance_cm is None:
             color = "#6b7280"
@@ -415,37 +439,47 @@ def plot_overlay(
             intensity_values(record, intensity_mode),
             color=color,
             linestyle="-",
-            linewidth=0.72,
-            alpha=0.72,
+            linewidth=0.8,
+            alpha=0.78,
         )
 
     ax.set_xlabel("Wavelength (nm)")
     ax.set_ylabel(y_axis_label(intensity_mode))
     ax.set_xlim(*xlim_nm)
     apply_y_axis_style(ax, intensity_mode)
-    ax.minorticks_on()
-    ax.text(0.97, 0.96, f"{title}\nn = {len(records)}", transform=ax.transAxes, va="top", ha="right")
+    apply_axes_style(ax)
+    ax.text(0.97, 0.96, f"{title}\nn = {len(records)}", transform=ax.transAxes, va="top", ha="right", fontsize=8.0)
 
     if numeric_distances:
         scalar_mappable = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
         colorbar = fig.colorbar(scalar_mappable, ax=ax, fraction=0.046, pad=0.02)
         colorbar.set_label("Position (cm)")
+        style_colorbar(colorbar)
 
-    out_png.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_png)
+    save_figure(fig, out_png)
     plt.close(fig)
 
 
+def config_display_title(config: PlotConfig, fiber_names: FiberNameMap) -> str:
+    """Return the display title for a PL plotting config."""
+    if config.title == config.group:
+        return fiber_names.real_name(config.group)
+    return config.title
+
+
 def is_reverse_position(position_suffix: str) -> bool:
+    """Return whether a position suffix denotes reverse orientation."""
     return "r" in position_suffix.lower()
 
 
 def is_background_record(record: PLSpectrum) -> bool:
+    """Return whether a spectrum record is background or dark data."""
     stem = record.path.stem.lower()
     return "background" in stem or "dark" in stem
 
 
 def config_note(record: PLSpectrum, default_overlay_paths: set[Path], default_single_paths: set[Path]) -> str:
+    """Return the default selection note for a PL spectrum config entry."""
     if is_background_record(record):
         return "background_or_dark_default_off"
     if is_reverse_position(record.position_suffix):
@@ -458,6 +492,7 @@ def config_note(record: PLSpectrum, default_overlay_paths: set[Path], default_si
 
 
 def write_plot_configs(records: list[PLSpectrum], config_dir: Path) -> None:
+    """Write per-group YAML configs for discovered PL spectra."""
     config_dir.mkdir(parents=True, exist_ok=True)
     standard_records = [
         record
@@ -478,7 +513,7 @@ def write_plot_configs(records: list[PLSpectrum], config_dir: Path) -> None:
             f"title: {yaml_scalar(group)}",
             f"x_min_nm: {SPECTRAL_XLIM_NM[0]}",
             f"x_max_nm: {SPECTRAL_XLIM_NM[1]}",
-            "colormap: \"brg\"",
+            f"colormap: {yaml_scalar(SEQUENTIAL_CMAP)}",
             "spectra:",
         ]
         for record in group_records:
@@ -501,6 +536,7 @@ def write_plot_configs(records: list[PLSpectrum], config_dir: Path) -> None:
 
 
 def configs_exist(config_dir: Path) -> bool:
+    """Return whether a config directory contains YAML files."""
     return config_dir.exists() and any(config_dir.glob("*.yaml"))
 
 
@@ -508,6 +544,7 @@ def selected_records_from_configs(
     configs: list[PlotConfig],
     records_by_path: dict[str, PLSpectrum],
 ) -> tuple[dict[str, list[PLSpectrum]], set[Path]]:
+    """Resolve selected records from YAML config entries."""
     overlay_by_group: dict[str, list[PLSpectrum]] = {}
     overlay_paths: set[Path] = set()
 
@@ -528,6 +565,7 @@ def selected_records_from_configs(
 
 
 def normalize_config_path(path_text: str) -> str:
+    """Normalize a path string from a YAML config entry."""
     normalized = Path(path_text.replace("\\", "/")).as_posix()
     obsolete_prefix = "raw data 2026 04 014 LHCb Fibers/"
     if normalized.startswith(obsolete_prefix):
@@ -536,6 +574,7 @@ def normalize_config_path(path_text: str) -> str:
 
 
 def clean_outputs(out_dir: Path) -> None:
+    """Remove generated PL plot outputs before a fresh run."""
     skipped: list[Path] = []
     if out_dir.exists():
         for path in sorted(out_dir.rglob("*"), reverse=True):
@@ -567,6 +606,7 @@ def load_records(
     include_background: bool = False,
     include_reverse: bool = False,
 ) -> list[PLSpectrum]:
+    """Load discoverable PL spectrum records from raw data."""
     records: list[PLSpectrum] = []
     for path in sorted(raw_dir.rglob("*_calc.txt")):
         if ".venv" in path.parts or "analysis" in path.parts:
@@ -615,11 +655,14 @@ def write_inventory(
     intensity_mode: str,
     out_csv: Path,
     out_dir: Path,
+    fiber_names: FiberNameMap,
 ) -> None:
+    """Write a CSV inventory of configured analysis records."""
     fields = [
         "intensity_mode",
         "relative_path",
         "group",
+        "fiber_name",
         "sample",
         "irradiation",
         "position_token",
@@ -656,6 +699,7 @@ def write_inventory(
                     "intensity_mode": intensity_mode,
                     "relative_path": record.path.as_posix(),
                     "group": record.group,
+                    "fiber_name": fiber_names.real_name(record.group),
                     "sample": record.sample,
                     "irradiation": record.irradiation,
                     "position_token": record.position_token,
@@ -684,10 +728,13 @@ def write_html(
     overlay_paths: dict[str, Path],
     intensity_mode: str,
     out_html: Path,
+    fiber_names: FiberNameMap,
 ) -> None:
+    """Write an HTML index for generated analysis outputs."""
     index_dir = out_html.parent.resolve()
 
     def link_to(path: Path) -> str:
+        """Return a relative link from the HTML index to an output path."""
         return Path(os.path.relpath(path.resolve(), index_dir)).as_posix()
 
     groups = sorted({record.group for record in records})
@@ -699,7 +746,7 @@ def write_html(
         overlay_png_link = f"<a href=\"{link_to(overlay_png)}\">PNG</a>" if isinstance(overlay_png, Path) else ""
         overlay_rows.append(
             "<tr>"
-            f"<td>{group}</td>"
+            f"<td>{fiber_names.real_name(group)}</td>"
             f"<td>{len(group_selected_records)} / {len(group_records)}</td>"
             f"<td>{overlay_png_link}</td>"
             f"<td><a href=\"{group}/\">sample folder</a></td>"
@@ -710,7 +757,7 @@ def write_html(
     for record in selected_records:
         single_rows.append(
             "<tr>"
-            f"<td>{record.group}</td>"
+            f"<td>{fiber_names.real_name(record.group)}</td>"
             f"<td>{record.position_token}</td>"
             f"<td>{record.cwl_nm or ''}</td>"
             f"<td>{record.measurement_date}</td>"
@@ -742,12 +789,12 @@ def write_html(
   <p>{mode_note} Plot membership is controlled by YAML files under <code>Analysis methods/configs/pl_spectra</code>. In each spectrum entry, <code>include</code> controls both the individual PNG and the combined sample PNG.</p>
   <h2>Sample Folders</h2>
   <table>
-    <thead><tr><th>sample</th><th>selected / listed</th><th>combined PNG</th><th>folder</th></tr></thead>
+    <thead><tr><th>fiber</th><th>selected / listed</th><th>combined PNG</th><th>folder</th></tr></thead>
     <tbody>{''.join(overlay_rows)}</tbody>
   </table>
   <h2>Selected Individual Figures</h2>
   <table>
-    <thead><tr><th>sample</th><th>position</th><th>cwl nm</th><th>date</th><th>source</th><th>PNG</th></tr></thead>
+    <thead><tr><th>fiber</th><th>position</th><th>cwl nm</th><th>date</th><th>source</th><th>PNG</th></tr></thead>
     <tbody>{''.join(single_rows)}</tbody>
   </table>
 </body>
@@ -757,11 +804,13 @@ def write_html(
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Run the PL spectrum plotting command-line interface."""
     parser = argparse.ArgumentParser(description="Plot time-integrated PL spectra from converted *_calc.txt files.")
     parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
     parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
     parser.add_argument("--out-subdir", type=Path, default=None)
     parser.add_argument("--config-dir", type=Path, default=DEFAULT_CONFIG_DIR)
+    parser.add_argument("--fiber-names-config", type=Path, default=DEFAULT_FIBER_NAMES_CONFIG)
     parser.add_argument("--intensity-mode", choices=INTENSITY_MODES, default="normalized")
     parser.add_argument("--refresh-configs", action="store_true", help="Rewrite YAML plot configs from the discovered *_calc.txt files.")
     parser.add_argument("--no-clean", action="store_true", help="Do not remove existing generated plots before writing.")
@@ -775,6 +824,8 @@ def main(argv: list[str] | None = None) -> None:
     out_dir = (results_dir / out_subdir).resolve()
     out_base = output_base_path(out_dir)
     config_dir = resolve_path(args.config_dir)
+    fiber_names_config = resolve_path(args.fiber_names_config)
+    fiber_names = read_fiber_name_map(fiber_names_config)
     set_publication_style()
 
     if not args.no_clean:
@@ -808,7 +859,7 @@ def main(argv: list[str] | None = None) -> None:
 
     for config in configs:
         for record in selected_by_group.get(config.group, []):
-            plot_single(record, args.intensity_mode, config.xlim_nm)
+            plot_single(record, args.intensity_mode, config.xlim_nm, fiber_names)
 
     overlay_paths: dict[str, Path] = {}
     for config in configs:
@@ -820,15 +871,15 @@ def main(argv: list[str] | None = None) -> None:
             group_records,
             out_png,
             args.intensity_mode,
-            title=config.title,
+            title=config_display_title(config, fiber_names),
             xlim_nm=config.xlim_nm,
             colormap=config.colormap,
         )
         overlay_paths[config.group] = out_png
 
     inventory_csv = out_base / "pl_spectra_inventory.csv"
-    write_inventory(records, overlay_paths, selected_record_paths, args.intensity_mode, inventory_csv, out_dir)
-    write_html(records, selected_records, overlay_paths, args.intensity_mode, out_base / "index.html")
+    write_inventory(records, overlay_paths, selected_record_paths, args.intensity_mode, inventory_csv, out_dir, fiber_names)
+    write_html(records, selected_records, overlay_paths, args.intensity_mode, out_base / "index.html", fiber_names)
 
     groups: dict[str, int] = {}
     for record in records:
@@ -841,9 +892,10 @@ def main(argv: list[str] | None = None) -> None:
     print(f"loaded PL spectra: {len(records)}")
     print(f"intensity mode: {args.intensity_mode}")
     print(f"config dir: {config_dir}")
+    print(f"fiber names: {fiber_names_config}")
     print("groups:")
     for group, count in sorted(groups.items()):
-        print(f"  {group}: {selected_groups.get(group, 0)} selected / {count} listed")
+        print(f"  {fiber_names.real_name(group)} ({group}): {selected_groups.get(group, 0)} selected / {count} listed")
     print(f"sample folders: {out_dir}")
     print(f"inventory: {inventory_csv}")
     print(f"html index: {out_dir / 'index.html'}")

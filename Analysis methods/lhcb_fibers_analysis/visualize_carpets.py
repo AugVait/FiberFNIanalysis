@@ -14,6 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .fiber_names import FiberNameMap, read_fiber_name_map
 from .hamamatsu_streak import (
     TOP_EDGE_CROP_ROWS,
     StreakCarpet,
@@ -27,13 +28,37 @@ from .hamamatsu_streak import (
     wavelength_axis_nm,
     x_scale_nm_per_pixel,
 )
-from .paths import DEFAULT_CARPET_CONFIG, DEFAULT_RAW_DIR, DEFAULT_RESULTS_DIR, resolve_path
+from .paths import (
+    DEFAULT_CARPET_CONFIG,
+    DEFAULT_FIBER_NAMES_CONFIG,
+    DEFAULT_RAW_DIR,
+    DEFAULT_RESULTS_DIR,
+    resolve_path,
+)
+from .plot_style import (
+    CARPET_CMAP,
+    COLORS,
+    DIAGNOSTIC_PANEL,
+    apply_axes_style,
+    save_figure,
+    set_publication_style,
+    style_colorbar,
+)
+from .scan_config import (
+    SectionConfig,
+    configs_exist,
+    normalize_config_path,
+    read_section_configs,
+    relative_config_dir,
+    yaml_scalar,
+)
 from .yaml_config import float_value, int_value, read_yaml_mapping, string_value
 
 
 @dataclass(frozen=True)
 class CarpetConfig:
     out_subdir: str = "carpets"
+    scan_config_dir: str = "carpets"
     top_edge_crop_rows: int = TOP_EDGE_CROP_ROWS
     background_percentile: float = 5.0
     signal_scale_percentile: float = 99.4
@@ -42,9 +67,11 @@ class CarpetConfig:
 
 
 def read_carpet_config(path: Path) -> CarpetConfig:
+    """Read Hamamatsu carpet visualization settings from YAML."""
     values = read_yaml_mapping(path)
     return CarpetConfig(
         out_subdir=string_value(values, "out_subdir", "carpets"),
+        scan_config_dir=string_value(values, "scan_config_dir", "carpets"),
         top_edge_crop_rows=max(0, int_value(values, "top_edge_crop_rows", TOP_EDGE_CROP_ROWS)),
         background_percentile=float_value(values, "background_percentile", 5.0),
         signal_scale_percentile=float_value(values, "signal_scale_percentile", 99.4),
@@ -71,12 +98,14 @@ class CarpetRecord:
 
     @property
     def group(self) -> str:
+        """Return the config group name."""
         sample = self.sample or "unknown"
         irradiation = self.irradiation or "unknown"
         return f"{sample}_{irradiation}"
 
 
 def parse_filename(path: Path) -> dict[str, object]:
+    """Extract carpet measurement metadata from a raw-data filename."""
     stem = path.stem.lower()
     sample = _match(stem, r"(?:^|[^a-z0-9])((?:bcf\d+g?)|(?:scsf\d+))(?=[^a-z0-9]|$)")
     irradiation = _match(stem, r"_(noir|ir)_")
@@ -98,16 +127,19 @@ def parse_filename(path: Path) -> dict[str, object]:
 
 
 def _match(text: str, pattern: str) -> str:
+    """Return the first regex capture group from text, if present."""
     match = re.search(pattern, text, flags=re.IGNORECASE)
     return match.group(1) if match else ""
 
 
 def _match_int(text: str, pattern: str) -> int | None:
+    """Return the first regex capture group converted to an integer."""
     value = _match(text, pattern)
     return int(value) if value else None
 
 
 def sort_key(record: CarpetRecord) -> tuple:
+    """Return a stable sort key for measurement records."""
     window_rank = {"1ns": 1, "2ns": 2, "5ns": 5, "10ns": 10, "20ns": 20, "50ns": 50, "100ns": 100}
     position = -1 if record.position_token == "endcm" else record.distance_cm or 9999
     return (
@@ -121,6 +153,7 @@ def sort_key(record: CarpetRecord) -> tuple:
 
 
 def scaled_core_image(data: np.ndarray, config: CarpetConfig) -> np.ndarray:
+    """Return an asinh-scaled carpet image after background subtraction."""
     arr = data.astype(np.float32)
     core = crop_top_edge(arr, config.top_edge_crop_rows)
     background = np.percentile(core, config.background_percentile)
@@ -137,24 +170,127 @@ def scaled_core_image(data: np.ndarray, config: CarpetConfig) -> np.ndarray:
 
 
 def _format_measurement(value: float | None, unit: str) -> str:
+    """Format a numeric measurement with units or unknown."""
     if value is None:
         return "unknown"
     return f"{value:.4g} {unit}"
 
 
-def label(record: CarpetRecord) -> str:
+def spaced_units(text: str) -> str:
+    """Insert a space between numeric values and unit suffixes."""
+    return re.sub(r"(?<=\d)(?=[A-Za-z])", " ", text)
+
+
+def label(record: CarpetRecord, fiber_names: FiberNameMap | None = None) -> str:
+    """Build a display label for a measurement record."""
+    group = fiber_names.real_name(record.group) if fiber_names is not None else record.group
     center_nm = spectrograph_center_nm(record.carpet)
     full_time_ns = time_range_ns(record.carpet)
     bits = [
-        record.path.stem,
-        f"{record.carpet.data.shape[0]}x{record.carpet.data.shape[1]}",
-        f"max {int(record.carpet.data.max())}",
-        f"x { _format_measurement(center_nm, 'nm') } | y { _format_measurement(full_time_ns, 'ns') }",
+        f"{group}, {spaced_units(record.position_token) or 'unknown'}, {spaced_units(record.time_window) or 'unknown'}",
+        f"max {int(record.carpet.data.max())} counts; x {_format_measurement(center_nm, 'nm')}; y {_format_measurement(full_time_ns, 'ns')}",
     ]
     return "\n".join(bits)
 
 
-def save_individual(record: CarpetRecord, config: CarpetConfig) -> None:
+def config_label(record: CarpetRecord) -> str:
+    """Build a metadata label for a carpet scan config entry."""
+    parts = [record.group]
+    if record.position_token:
+        parts.append(record.position_token)
+    if record.time_window:
+        parts.append(record.time_window)
+    if record.measurement_date:
+        parts.append(record.measurement_date)
+    return ", ".join(parts)
+
+
+def scan_note(record: CarpetRecord) -> str:
+    """Classify a carpet scan for selection-config notes."""
+    if record.position_token == "endcm":
+        return "endpoint_condition"
+    if record.replicate:
+        return "replicate_or_reverse_orientation"
+    return "default_on"
+
+
+def write_scan_configs(records: list[CarpetRecord], config_dir: Path, config: CarpetConfig) -> None:
+    """Write per-group YAML configs for discovered carpet scans."""
+    config_dir.mkdir(parents=True, exist_ok=True)
+    for group in sorted({record.group for record in records}):
+        group_records = [record for record in records if record.group == group]
+        lines = [
+            "# Edit include values, then rerun python -m lhcb_fibers_analysis.visualize_carpets.",
+            "# include: true writes an individual quicklook and adds the scan to the contact sheets.",
+            f"group: {yaml_scalar(group)}",
+            f"title: {yaml_scalar(group)}",
+            f"top_edge_crop_rows: {yaml_scalar(config.top_edge_crop_rows)}",
+            "scans:",
+        ]
+        for record in group_records:
+            wavelengths_nm = wavelength_axis_nm(record.carpet)
+            full_time_ns = time_range_ns(record.carpet)
+            visible_time_ns = visible_time_range_ns(
+                record.carpet,
+                cropped=True,
+                crop_rows=config.top_edge_crop_rows,
+            )
+            lines.extend(
+                [
+                    f"  - include: {yaml_scalar(True)}",
+                    f"    path: {yaml_scalar(record.path.as_posix())}",
+                    f"    label: {yaml_scalar(config_label(record))}",
+                    f"    sample: {yaml_scalar(record.sample)}",
+                    f"    irradiation: {yaml_scalar(record.irradiation)}",
+                    f"    position_token: {yaml_scalar(record.position_token)}",
+                    f"    distance_cm: {yaml_scalar(record.distance_cm if record.distance_cm is not None else '')}",
+                    f"    replicate: {yaml_scalar(record.replicate)}",
+                    f"    pulse_energy_nj: {yaml_scalar(record.pulse_energy_nj if record.pulse_energy_nj is not None else '')}",
+                    f"    time_window: {yaml_scalar(record.time_window)}",
+                    f"    measurement_date: {yaml_scalar(record.measurement_date)}",
+                    f"    acquisition_date: {yaml_scalar(record.acquisition_date)}",
+                    f"    acquisition_time: {yaml_scalar(record.acquisition_time)}",
+                    f"    rows: {yaml_scalar(record.carpet.data.shape[0])}",
+                    f"    cols: {yaml_scalar(record.carpet.data.shape[1])}",
+                    f"    spectrograph_center_nm: {yaml_scalar(spectrograph_center_nm(record.carpet) or '')}",
+                    f"    x_scale_nm_per_pixel: {yaml_scalar(x_scale_nm_per_pixel(record.carpet) or '')}",
+                    f"    x_start_nm: {yaml_scalar(float(wavelengths_nm[0]) if wavelengths_nm is not None else '')}",
+                    f"    x_end_nm: {yaml_scalar(float(wavelengths_nm[-1]) if wavelengths_nm is not None else '')}",
+                    f"    time_range_ns: {yaml_scalar(full_time_ns or '')}",
+                    f"    visible_time_range_ns: {yaml_scalar(visible_time_ns or '')}",
+                    f"    note: {yaml_scalar(scan_note(record))}",
+                ]
+            )
+        (config_dir / f"{group}.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def selected_records_from_configs(
+    configs: list[SectionConfig],
+    records_by_path: dict[str, CarpetRecord],
+) -> tuple[list[CarpetRecord], set[Path], set[Path]]:
+    """Resolve selected records from YAML config entries."""
+    configured_paths: set[Path] = set()
+    selected_paths: set[Path] = set()
+    selected: list[CarpetRecord] = []
+
+    for config in configs:
+        for entry in config.entries:
+            rel_path = normalize_config_path(str(entry.get("path", "")))
+            record = records_by_path.get(rel_path)
+            if record is None:
+                print(f"warning: carpet config path not found, skipping: {rel_path}")
+                continue
+            configured_paths.add(record.path)
+            if bool(entry.get("include", False)):
+                selected.append(record)
+                selected_paths.add(record.path)
+
+    return sorted(selected, key=sort_key), selected_paths, configured_paths
+
+
+def save_individual(record: CarpetRecord, config: CarpetConfig, fiber_names: FiberNameMap) -> None:
+    """Save an individual carpet quicklook figure."""
+    set_publication_style(base_font_size=8.0)
     raw_data = record.carpet.data
     core_data = crop_top_edge(raw_data, config.top_edge_crop_rows)
     shown = scaled_core_image(raw_data, config)
@@ -170,7 +306,7 @@ def save_individual(record: CarpetRecord, config: CarpetConfig) -> None:
         crop_rows=config.top_edge_crop_rows,
     )
 
-    fig = plt.figure(figsize=(12, 8), constrained_layout=True)
+    fig = plt.figure(figsize=DIAGNOSTIC_PANEL, constrained_layout=True)
     gs = fig.add_gridspec(2, 2, width_ratios=[4, 1.25], height_ratios=[4, 1.25])
     ax_img = fig.add_subplot(gs[0, 0])
     ax_row = fig.add_subplot(gs[0, 1])
@@ -178,35 +314,40 @@ def save_individual(record: CarpetRecord, config: CarpetConfig) -> None:
     ax_info = fig.add_subplot(gs[1, 1])
 
     imshow_kwargs = {"extent": extent} if extent is not None else {}
-    im = ax_img.imshow(shown, origin="lower", aspect="auto", cmap="magma", **imshow_kwargs)
-    ax_img.set_title(record.path.name)
-    ax_img.set_xlabel("wavelength (nm)" if wavelengths_nm is not None else "x pixel")
-    ax_img.set_ylabel("time (ns)" if times_ns is not None else "y pixel")
-    fig.colorbar(im, ax=ax_img, fraction=0.035, pad=0.02, label="asinh contrast")
+    im = ax_img.imshow(shown, origin="lower", aspect="auto", cmap=CARPET_CMAP, **imshow_kwargs)
+    ax_img.set_title(
+        f"{fiber_names.real_name(record.group)}, {spaced_units(record.position_token) or 'unknown'}, {spaced_units(record.time_window) or 'unknown'}",
+        pad=5,
+    )
+    ax_img.set_xlabel("Wavelength (nm)" if wavelengths_nm is not None else "x pixel")
+    ax_img.set_ylabel("Time (ns)" if times_ns is not None else "y pixel")
+    colorbar = fig.colorbar(im, ax=ax_img, fraction=0.035, pad=0.02, label="Asinh contrast")
+    style_colorbar(colorbar)
 
     row_axis = times_ns if times_ns is not None else np.arange(shown.shape[0])
-    ax_row.plot(row_profile, row_axis, color="#0F766E", linewidth=1.0)
-    ax_row.set_title("row mean, cropped+scaled")
-    ax_row.set_xlabel("asinh contrast")
-    ax_row.set_ylabel("time (ns)" if times_ns is not None else "y pixel")
+    ax_row.plot(row_profile, row_axis, color=COLORS["teal"], linewidth=0.9)
+    ax_row.set_title("Row mean", pad=4)
+    ax_row.set_xlabel("Asinh contrast")
+    ax_row.set_ylabel("Time (ns)" if times_ns is not None else "y pixel")
     if visible_time_ns is not None:
         ax_row.set_ylim(0, visible_time_ns)
-    ax_row.grid(alpha=0.25)
+    apply_axes_style(ax_row, grid=True)
 
     col_axis = wavelengths_nm if wavelengths_nm is not None else np.arange(shown.shape[1])
-    ax_col.plot(col_axis, col_profile, color="#1D4ED8", linewidth=1.0)
-    ax_col.set_title("column mean, cropped+scaled")
-    ax_col.set_xlabel("wavelength (nm)" if wavelengths_nm is not None else "x pixel")
-    ax_col.set_ylabel("asinh contrast")
+    ax_col.plot(col_axis, col_profile, color=COLORS["blue"], linewidth=0.9)
+    ax_col.set_title("Column mean", pad=4)
+    ax_col.set_xlabel("Wavelength (nm)" if wavelengths_nm is not None else "x pixel")
+    ax_col.set_ylabel("Asinh contrast")
     if extent is not None:
         ax_col.set_xlim(extent[0], extent[1])
-    ax_col.grid(alpha=0.25)
+    apply_axes_style(ax_col, grid=True)
 
     info = [
-        f"sample: {record.sample}/{record.irradiation}",
-        f"position: {record.position_token or 'unknown'}",
+        f"fiber: {fiber_names.real_name(record.group)}",
+        f"experimental: {record.group}",
+        f"position: {spaced_units(record.position_token) or 'unknown'}",
         f"pulse: {record.pulse_energy_nj or ''} nJ",
-        f"window: {record.time_window or ''}",
+        f"window: {spaced_units(record.time_window)}",
         f"display: top {config.top_edge_crop_rows} rows cropped",
         f"x scale: {_format_measurement(spectrograph_center_nm(record.carpet), 'nm')} center, {_format_measurement(x_scale_nm_per_pixel(record.carpet), 'nm/pixel')}",
         f"y scale: {_format_measurement(visible_time_ns, 'ns')} visible of {_format_measurement(time_range_ns(record.carpet), 'ns')}",
@@ -217,19 +358,26 @@ def save_individual(record: CarpetRecord, config: CarpetConfig) -> None:
         f"raw max: {int(raw_data.max())}",
     ]
     ax_info.axis("off")
-    ax_info.text(0, 1, "\n".join(info), va="top", ha="left", fontsize=10)
+    ax_info.text(0, 1, "\n".join(info), va="top", ha="left", fontsize=7.1, linespacing=1.18)
 
-    record.out_png.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(record.out_png, dpi=160)
+    save_figure(fig, record.out_png, dpi=260)
     plt.close(fig)
 
 
-def save_contact_sheet(records: list[CarpetRecord], out_path: Path, title: str, config: CarpetConfig) -> None:
+def save_contact_sheet(
+    records: list[CarpetRecord],
+    out_path: Path,
+    title: str,
+    config: CarpetConfig,
+    fiber_names: FiberNameMap,
+) -> None:
+    """Save a contact sheet for selected carpet records."""
     if not records:
         return
+    set_publication_style(base_font_size=7.2)
     cols = min(config.contact_sheet_max_columns, max(1, math.ceil(math.sqrt(len(records)))))
     rows = math.ceil(len(records) / cols)
-    fig, axes = plt.subplots(rows, cols, figsize=(cols * 4.2, rows * 3.2), constrained_layout=True)
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 3.35, rows * 2.55), constrained_layout=True)
     axes_arr = np.atleast_1d(axes).ravel()
 
     for ax, record in zip(axes_arr, records):
@@ -239,25 +387,33 @@ def save_contact_sheet(records: list[CarpetRecord], out_path: Path, title: str, 
             scaled_core_image(record.carpet.data, config),
             origin="lower",
             aspect="auto",
-            cmap="magma",
+            cmap=CARPET_CMAP,
             **imshow_kwargs,
         )
-        ax.set_title(label(record), fontsize=8)
+        ax.set_title(label(record, fiber_names), fontsize=6.5, pad=2)
         ax.set_xticks([])
         ax.set_yticks([])
     for ax in axes_arr[len(records):]:
         ax.axis("off")
 
-    fig.suptitle(title, fontsize=14)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=160)
+    fig.suptitle(title, fontsize=9.0, fontweight="normal")
+    save_figure(fig, out_path, dpi=220)
     plt.close(fig)
 
 
-def write_inventory(records: list[CarpetRecord], out_csv: Path, out_dir: Path, config: CarpetConfig) -> None:
+def write_inventory(
+    records: list[CarpetRecord],
+    selected_record_paths: set[Path],
+    out_csv: Path,
+    out_dir: Path,
+    config: CarpetConfig,
+    fiber_names: FiberNameMap,
+) -> None:
+    """Write a CSV inventory of configured analysis records."""
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     fields = [
         "relative_path",
+        "fiber_name",
         "sample",
         "irradiation",
         "position_token",
@@ -292,6 +448,7 @@ def write_inventory(records: list[CarpetRecord], out_csv: Path, out_dir: Path, c
         "scaled_mean",
         "raw_min",
         "raw_max",
+        "selected",
         "individual_png",
     ]
     with out_csv.open("w", newline="", encoding="utf-8") as handle:
@@ -312,6 +469,7 @@ def write_inventory(records: list[CarpetRecord], out_csv: Path, out_dir: Path, c
             writer.writerow(
                 {
                     "relative_path": record.path.as_posix(),
+                    "fiber_name": fiber_names.real_name(record.group),
                     "sample": record.sample,
                     "irradiation": record.irradiation,
                     "position_token": record.position_token,
@@ -348,34 +506,49 @@ def write_inventory(records: list[CarpetRecord], out_csv: Path, out_dir: Path, c
                     "scaled_mean": float(scaled.mean()),
                     "raw_min": int(data.min()),
                     "raw_max": int(data.max()),
-                    "individual_png": Path(os.path.relpath(record.out_png, out_dir)).as_posix(),
+                    "selected": "yes" if record.path in selected_record_paths else "no",
+                    "individual_png": Path(os.path.relpath(record.out_png, out_dir)).as_posix()
+                    if record.path in selected_record_paths
+                    else "",
                 }
             )
 
 
 def write_html(
     records: list[CarpetRecord],
+    selected_records: list[CarpetRecord],
     contact_sheets: list[Path],
     out_html: Path,
     config: CarpetConfig,
+    fiber_names: FiberNameMap,
 ) -> None:
+    """Write an HTML index for generated analysis outputs."""
     index_dir = out_html.parent.resolve()
 
     def link_to(path: Path) -> str:
+        """Return a relative link from the HTML index to an output path."""
         return Path(os.path.relpath(path.resolve(), index_dir)).as_posix()
 
     rows = []
+    selected_record_paths = {record.path for record in selected_records}
     for record in records:
         full_time_ns = time_range_ns(record.carpet)
+        quicklook_link = (
+            f"<a href=\"{link_to(record.out_png)}\">quicklook</a>"
+            if record.path in selected_record_paths
+            else ""
+        )
         rows.append(
             "<tr>"
+            f"<td>{fiber_names.real_name(record.group)}</td>"
             f"<td>{record.group}</td>"
             f"<td>{record.position_token}</td>"
             f"<td>{record.time_window}</td>"
             f"<td>{_format_measurement(spectrograph_center_nm(record.carpet), 'nm')}</td>"
             f"<td>{_format_measurement(full_time_ns, 'ns')}</td>"
+            f"<td>{'yes' if record.path in selected_record_paths else 'no'}</td>"
             f"<td>{record.path.as_posix()}</td>"
-            f"<td><a href=\"{link_to(record.out_png)}\">quicklook</a></td>"
+            f"<td>{quicklook_link}</td>"
             "</tr>"
         )
     sheet_links = "\n".join(
@@ -395,13 +568,13 @@ def write_html(
 </head>
 <body>
   <h1>Hamamatsu Carpet Visualizations</h1>
-  <p>Loaded {len(records)} streak-camera carpets. Individual quicklooks crop the top {config.top_edge_crop_rows} rows, use asinh contrast, and compute row/column mean profiles from that same cropped/scaled view.</p>
+  <p>Loaded {len(records)} configured streak-camera carpets; {len(selected_records)} are selected for figure output. Individual quicklooks crop the top {config.top_edge_crop_rows} rows, use asinh contrast, and compute row/column mean profiles from that same cropped/scaled view.</p>
   <p>X axes use the spectrograph wavelength calibration in nm. Y axes use the streak-camera time range in ns, scaled to the visible rows after the top-edge crop.</p>
   <h2>Contact Sheets</h2>
   <ul>{sheet_links}</ul>
   <h2>Individual Files</h2>
   <table>
-    <thead><tr><th>group</th><th>position</th><th>window</th><th>x center</th><th>y range</th><th>source</th><th>view</th></tr></thead>
+    <thead><tr><th>fiber</th><th>experimental</th><th>position</th><th>window</th><th>x center</th><th>y range</th><th>selected</th><th>source</th><th>view</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
 </body>
@@ -411,6 +584,7 @@ def write_html(
 
 
 def load_records(raw_dir: Path, out_dir: Path) -> list[CarpetRecord]:
+    """Load discoverable PL spectrum records from raw data."""
     records: list[CarpetRecord] = []
     for path in sorted(raw_dir.rglob("*.img")):
         if ".venv" in path.parts or "analysis" in path.parts:
@@ -449,55 +623,91 @@ def load_records(raw_dir: Path, out_dir: Path) -> list[CarpetRecord]:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Run the carpet visualization command-line interface."""
     parser = argparse.ArgumentParser(description="Load all Hamamatsu .img carpets and create quicklook visualizations.")
     parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
     parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
     parser.add_argument("--config", type=Path, default=DEFAULT_CARPET_CONFIG)
+    parser.add_argument("--scan-config-dir", type=Path, default=None)
+    parser.add_argument("--fiber-names-config", type=Path, default=DEFAULT_FIBER_NAMES_CONFIG)
     parser.add_argument("--out-subdir", type=Path, default=None)
+    parser.add_argument("--refresh-configs", action="store_true", help="Rewrite per-sample carpet scan configs.")
     args = parser.parse_args(argv)
 
     raw_dir = resolve_path(args.raw_dir)
     results_dir = resolve_path(args.results_dir)
-    config = read_carpet_config(resolve_path(args.config))
+    config_path = resolve_path(args.config)
+    fiber_names_config = resolve_path(args.fiber_names_config)
+    fiber_names = read_fiber_name_map(fiber_names_config)
+    config = read_carpet_config(config_path)
+    scan_config_dir = (
+        resolve_path(args.scan_config_dir)
+        if args.scan_config_dir is not None
+        else relative_config_dir(config_path, config.scan_config_dir)
+    )
     out_subdir = args.out_subdir or Path(config.out_subdir)
     out_dir = (results_dir / out_subdir).resolve()
-    records = load_records(raw_dir, out_dir)
-    if not records:
+    discovered_records = load_records(raw_dir, out_dir)
+    if not discovered_records:
         raise SystemExit("No .img carpets found.")
 
-    for record in records:
-        save_individual(record, config)
+    if args.refresh_configs or not configs_exist(scan_config_dir):
+        write_scan_configs(discovered_records, scan_config_dir, config)
+
+    scan_configs = read_section_configs(scan_config_dir, "scans")
+    if not scan_configs:
+        raise SystemExit(f"No carpet scan YAML configs found in {scan_config_dir}")
+
+    records_by_path = {record.path.as_posix(): record for record in discovered_records}
+    selected_records, selected_record_paths, configured_record_paths = selected_records_from_configs(
+        scan_configs, records_by_path
+    )
+    records = [record for record in discovered_records if record.path in configured_record_paths]
+    if not selected_records:
+        raise SystemExit(f"No carpet scans are selected in {scan_config_dir}")
+
+    for record in selected_records:
+        save_individual(record, config, fiber_names)
 
     contact_sheets: list[Path] = []
     all_sheet = out_dir / "contact_sheets" / "all_carpets.png"
     save_contact_sheet(
-        records,
+        selected_records,
         all_sheet,
         f"All Hamamatsu Streak-Camera Carpets, Top {config.top_edge_crop_rows} Rows Cropped",
         config,
+        fiber_names,
     )
     contact_sheets.append(all_sheet)
 
-    for group in sorted({record.group for record in records}):
-        subset = [record for record in records if record.group == group]
+    for group in sorted({record.group for record in selected_records}):
+        subset = [record for record in selected_records if record.group == group]
         sheet = out_dir / "contact_sheets" / f"{group}.png"
-        save_contact_sheet(subset, sheet, f"{group}, Top {config.top_edge_crop_rows} Rows Cropped", config)
+        title = f"{fiber_names.real_name(group)}, Top {config.top_edge_crop_rows} Rows Cropped"
+        save_contact_sheet(subset, sheet, title, config, fiber_names)
         contact_sheets.append(sheet)
 
     inventory_csv = out_dir / "carpet_inventory.csv"
-    write_inventory(records, inventory_csv, out_dir, config)
-    write_html(records, contact_sheets, out_dir / "index.html", config)
+    write_inventory(records, selected_record_paths, inventory_csv, out_dir, config, fiber_names)
+    write_html(records, selected_records, contact_sheets, out_dir / "index.html", config, fiber_names)
 
     groups = {}
     for record in records:
         groups.setdefault(record.group, 0)
         groups[record.group] += 1
-    print(f"loaded carpets: {len(records)}")
+    selected_groups = {}
+    for record in selected_records:
+        selected_groups.setdefault(record.group, 0)
+        selected_groups[record.group] += 1
+    print(f"loaded carpets: {len(records)} configured")
+    print(f"selected carpets: {len(selected_records)}")
     print("groups:")
     for group, count in sorted(groups.items()):
-        print(f"  {group}: {count}")
+        print(f"  {fiber_names.real_name(group)} ({group}): {selected_groups.get(group, 0)} selected / {count} listed")
     print(f"inventory: {inventory_csv}")
-    print(f"config: {resolve_path(args.config)}")
+    print(f"config: {config_path}")
+    print(f"fiber names: {fiber_names_config}")
+    print(f"scan configs: {scan_config_dir}")
     print(f"contact sheets: {out_dir / 'contact_sheets'}")
     print(f"individual quicklooks: {out_dir / 'individual'}")
     print(f"html index: {out_dir / 'index.html'}")

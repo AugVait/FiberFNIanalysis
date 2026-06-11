@@ -1,0 +1,56 @@
+# Edit include values, then rerun python -m lhcb_fibers_analysis.fit_it_decay.
+# include: true fits the trace and writes its diagnostic PNG/PDF.
+group: "scsf5_noir"
+title: "scsf5_noir"
+traces:
+  - include: true
+    path: "2026 04 23/IT_scsf5_noir_100cm_ex360nm_10nJ_10ns.dat"
+    label: "scsf5_noir, 100cm, 10ns, 450.339 nm, 2026-04-23"
+    sample: "scsf5_noir"
+    position: "100cm"
+    distance_cm: 100
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 450.339
+    measurement_date: "2026-04-23"
+    points: 508
+    delay_min_ns: -2.37119484
+    delay_max_ns: 10.42682076
+    counts_max: 259.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 23/IT_scsf5_noir_200cm_ex360nm_10nJ_10ns.dat"
+    label: "scsf5_noir, 200cm, 10ns, 450.339 nm, 2026-04-23"
+    sample: "scsf5_noir"
+    position: "200cm"
+    distance_cm: 200
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 450.339
+    measurement_date: "2026-04-23"
+    points: 508
+    delay_min_ns: -2.0472908
+    delay_max_ns: 10.75072479
+    counts_max: 222.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 23/IT_scsf5_noir_37cm_ex360nm_10nJ_10ns.dat"
+    label: "scsf5_noir, 37cm, 10ns, 450.339 nm, 2026-04-23"
+    sample: "scsf5_noir"
+    position: "37cm"
+    distance_cm: 37
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 450.339
+    measurement_date: "2026-04-23"
+    points: 508
+    delay_min_ns: -1.44898319
+    delay_max_ns: 11.3490324
+    counts_max: 512.0
+    note: "default_on"

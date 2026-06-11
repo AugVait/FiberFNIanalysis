@@ -24,6 +24,7 @@ PACKAGES = [
 
 
 def check_environment() -> list[str]:
+    """Check whether required Python packages can be imported."""
     missing: list[str] = []
     for name in PACKAGES:
         try:
@@ -37,6 +38,7 @@ def check_environment() -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the environment verification command."""
     parser = argparse.ArgumentParser(description="Check that the analysis Python packages can be imported.")
     parser.parse_args(argv)
     missing = check_environment()

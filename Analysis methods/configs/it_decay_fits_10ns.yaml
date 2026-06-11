@@ -1,5 +1,6 @@
 # Integrated-time trace decay fitting settings.
 out_subdir: "it_decay_fits_10ns"
+trace_config_dir: "it_decay_fits_10ns"
 time_window: "10ns"
 smooth_sigma: 2.0
 min_points: 30

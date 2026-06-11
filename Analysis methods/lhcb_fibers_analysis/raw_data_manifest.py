@@ -33,14 +33,17 @@ class CheckResult:
 
     @property
     def ok(self) -> bool:
+        """Return whether the manifest check found no differences."""
         return not (self.missing or self.extra or self.size_mismatches or self.hash_mismatches)
 
 
 def relative_path(path: Path, raw_dir: Path) -> str:
+    """Return a POSIX-style path relative to a root directory."""
     return path.relative_to(raw_dir).as_posix()
 
 
 def sha256_file(path: Path) -> str:
+    """Calculate the SHA-256 digest for a file."""
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(CHUNK_SIZE), b""):
@@ -49,6 +52,7 @@ def sha256_file(path: Path) -> str:
 
 
 def iter_raw_files(raw_dir: Path) -> list[Path]:
+    """Yield raw-data files while skipping ignored directories."""
     if not raw_dir.exists():
         raise FileNotFoundError(f"Raw data directory does not exist: {raw_dir}")
     if not raw_dir.is_dir():
@@ -57,6 +61,7 @@ def iter_raw_files(raw_dir: Path) -> list[Path]:
 
 
 def classify(path_text: str) -> list[str]:
+    """Return input-family labels for a raw-data path."""
     name = Path(path_text).name.lower()
     labels: list[str] = []
     if name.endswith(".img"):
@@ -73,11 +78,13 @@ def classify(path_text: str) -> list[str]:
 
 
 def extension_label(path_text: str) -> str:
+    """Return a normalized file-extension label for a path."""
     suffix = Path(path_text).suffix.lower()
     return suffix or "<none>"
 
 
 def summarize(files: list[ManifestFile]) -> dict[str, object]:
+    """Build summary counts for manifest entries."""
     by_extension: Counter[str] = Counter()
     input_families: Counter[str] = Counter()
     total_bytes = 0
@@ -95,6 +102,7 @@ def summarize(files: list[ManifestFile]) -> dict[str, object]:
 
 
 def build_manifest(raw_dir: Path) -> dict[str, object]:
+    """Build a raw-data manifest from files under a root directory."""
     files = [
         ManifestFile(
             path=relative_path(path, raw_dir),
@@ -113,6 +121,7 @@ def build_manifest(raw_dir: Path) -> dict[str, object]:
 
 
 def load_manifest(path: Path) -> dict[str, object]:
+    """Load a raw-data manifest from JSON."""
     with path.open("r", encoding="utf-8") as handle:
         manifest = json.load(handle)
     if manifest.get("schema_version") != MANIFEST_VERSION:
@@ -124,6 +133,7 @@ def load_manifest(path: Path) -> dict[str, object]:
 
 
 def manifest_files(manifest: dict[str, object]) -> dict[str, ManifestFile]:
+    """Return manifest entries keyed by relative path."""
     entries = {}
     for raw_entry in manifest.get("files", []):
         entry = ManifestFile(
@@ -136,6 +146,7 @@ def manifest_files(manifest: dict[str, object]) -> dict[str, ManifestFile]:
 
 
 def check_manifest(raw_dir: Path, manifest_path: Path) -> CheckResult:
+    """Compare a raw-data folder against a saved manifest."""
     manifest = load_manifest(manifest_path)
     expected = manifest_files(manifest)
     current_paths = {relative_path(path, raw_dir): path for path in iter_raw_files(raw_dir)}
@@ -178,6 +189,7 @@ def check_manifest(raw_dir: Path, manifest_path: Path) -> CheckResult:
 
 
 def print_summary(summary: dict[str, object]) -> None:
+    """Print manifest summary counts."""
     print(f"total files: {summary.get('total_files', 0)}")
     print(f"total bytes: {summary.get('total_bytes', 0)}")
     print("by extension:")
@@ -189,6 +201,7 @@ def print_summary(summary: dict[str, object]) -> None:
 
 
 def print_limited(title: str, values: list[str], limit: int = 20) -> None:
+    """Print a limited list of path differences."""
     if not values:
         return
     print(f"{title}: {len(values)}")
@@ -199,6 +212,7 @@ def print_limited(title: str, values: list[str], limit: int = 20) -> None:
 
 
 def create_command(args: argparse.Namespace) -> int:
+    """Run the manifest creation command."""
     raw_dir = resolve_path(args.raw_dir)
     out_path = resolve_path(args.out)
     manifest = build_manifest(raw_dir)
@@ -210,6 +224,7 @@ def create_command(args: argparse.Namespace) -> int:
 
 
 def check_command(args: argparse.Namespace) -> int:
+    """Run the manifest validation command."""
     raw_dir = resolve_path(args.raw_dir)
     manifest_path = resolve_path(args.manifest)
     result = check_manifest(raw_dir, manifest_path)
@@ -228,6 +243,7 @@ def check_command(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the raw-data manifest command-line parser."""
     parser = argparse.ArgumentParser(description="Create or verify the raw-data SHA-256 manifest.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -245,6 +261,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the raw-data manifest command-line interface."""
     parser = build_parser()
     args = parser.parse_args(argv)
     return int(args.func(args))

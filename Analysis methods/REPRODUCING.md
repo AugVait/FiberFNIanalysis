@@ -40,6 +40,7 @@ The raw-data check must pass before reproducing results. For the current manifes
 ```
 
 `run_all` reads `configs/run_all.yaml`, which points to the YAML configs for each analysis family.
+The same run config also points to `configs/fiber_names.yaml`, where experimental result names can be mapped to real fiber names for plot labels and output tables.
 
 Expected generated result folders:
 
@@ -60,7 +61,24 @@ Expected generated result folders:
 Each individual command also accepts a config flag:
 
 - `visualize_carpets --config configs\carpets.yaml`
+- `visualize_carpets --fiber-names-config configs\fiber_names.yaml`
 - `plot_pl_spectra --config-dir configs\pl_spectra`
+- `plot_pl_spectra --fiber-names-config configs\fiber_names.yaml`
 - `fit_it_decay --config configs\it_decay_fits_10ns.yaml`
+- `fit_it_decay --fiber-names-config configs\fiber_names.yaml`
 
-Use `--refresh-configs` with `plot_pl_spectra` only when intentionally rebuilding the curated YAML selection files from discovered spectra.
+Use `--refresh-configs` only when intentionally rebuilding curated YAML selection files from discovered raw data. It is supported by `visualize_carpets`, `plot_pl_spectra`, and `fit_it_decay`.
+
+## Manual Carpet Wavelength-Cut Fits
+
+For exploratory work on a single streak-camera carpet:
+
+```powershell
+.\.venv\Scripts\python.exe -m lhcb_fibers_analysis.carpet_wavelength_cuts `
+  "..\raw data\2026 04 17\bcf_6\bcf6_ir_100cm_ex360nm_10nJ_10ns.img" `
+  --wavelength-min-nm 400 --wavelength-max-nm 540 `
+  --step-nm 10 --band-width-nm 10 `
+  --fit-start-offset-ns 0.05
+```
+
+This writes a manual output folder under `..\Analysis results\manual_carpet_wavelength_cuts\` unless `--out-dir` is supplied.

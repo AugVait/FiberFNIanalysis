@@ -1,0 +1,39 @@
+# Edit include values, then rerun python -m lhcb_fibers_analysis.fit_it_decay.
+# include: true fits the trace and writes its diagnostic PNG/PDF.
+group: "scsf2_ir"
+title: "scsf2_ir"
+traces:
+  - include: true
+    path: "2026 04 24/IT_scsf2_ir_200cm_ex360nm_10nJ_10ns.dat"
+    label: "scsf2_ir, 200cm, 10ns, 450.339 nm, 2026-04-24"
+    sample: "scsf2_ir"
+    position: "200cm"
+    distance_cm: 200
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 450.339
+    measurement_date: "2026-04-24"
+    points: 508
+    delay_min_ns: -1.87283611
+    delay_max_ns: 10.92517948
+    counts_max: 259.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 24/IT_scsf2_ir_37cm_ex360nm_10nJ_10ns.dat"
+    label: "scsf2_ir, 37cm, 10ns, 439.961 nm, 2026-04-24"
+    sample: "scsf2_ir"
+    position: "37cm"
+    distance_cm: 37
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-24"
+    points: 508
+    delay_min_ns: -1.5238018
+    delay_max_ns: 11.27421379
+    counts_max: 1017.0
+    note: "default_on"

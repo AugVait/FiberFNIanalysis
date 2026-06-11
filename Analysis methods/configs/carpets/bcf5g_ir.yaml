@@ -1,0 +1,468 @@
+# Edit include values, then rerun python -m lhcb_fibers_analysis.visualize_carpets.
+# include: true writes an individual quicklook and adds the scan to the contact sheets.
+group: "bcf5g_ir"
+title: "bcf5g_ir"
+top_edge_crop_rows: 12
+scans:
+  - include: true
+    path: "2026 04 21/bcf_5G/bcf5g_ir_37cm_ex360nm_10nJ_2ns.img"
+    label: "bcf5g_ir, 37cm, 2ns, 2026-04-21"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "37cm"
+    distance_cm: 37
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-04-21"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "3:02:15 PM.323"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "default_on"
+  - include: true
+    path: "2026 04 21/bcf_5G/bcf5g_ir_37cm_ex360nm_10nJ_10ns.img"
+    label: "bcf5g_ir, 37cm, 10ns, 2026-04-21"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "37cm"
+    distance_cm: 37
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-21"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "2:40:33 PM.542"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 04 21/bcf_5G/bcf5g_ir_37cm_ex360nm_10nJ_50ns.img"
+    label: "bcf5g_ir, 37cm, 50ns, 2026-04-21"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "37cm"
+    distance_cm: 37
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-04-21"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "2:30:26 PM.757"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "default_on"
+  - include: true
+    path: "2026 04 21/bcf_5G/bcf5g_ir_120cm_ex360nm_10nJ_2ns.img"
+    label: "bcf5g_ir, 120cm, 2ns, 2026-04-21"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "120cm"
+    distance_cm: 120
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-04-21"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "3:23:55 PM.299"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "default_on"
+  - include: true
+    path: "2026 04 21/bcf_5G/bcf5g_ir_120cm_ex360nm_10nJ_10ns.img"
+    label: "bcf5g_ir, 120cm, 10ns, 2026-04-21"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "120cm"
+    distance_cm: 120
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-21"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "3:45:48 PM.273"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 04 21/bcf_5G/bcf5g_ir_120cm_ex360nm_10nJ_50ns.img"
+    label: "bcf5g_ir, 120cm, 50ns, 2026-04-21"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "120cm"
+    distance_cm: 120
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-04-21"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "4:04:29 PM.176"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "default_on"
+  - include: true
+    path: "2026 04 21/bcf_5G/bcf5g_ir_200cm_ex360nm_10nJ_2ns.img"
+    label: "bcf5g_ir, 200cm, 2ns, 2026-04-21"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "200cm"
+    distance_cm: 200
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-04-21"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "1:43:51 PM.053"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "default_on"
+  - include: true
+    path: "2026 04 21/bcf_5G/bcf5g_ir_200cm_ex360nm_10nJ_10ns.img"
+    label: "bcf5g_ir, 200cm, 10ns, 2026-04-21"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "200cm"
+    distance_cm: 200
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-21"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "1:24:38 PM.837"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 04 21/bcf_5G/bcf5g_ir_200cm_ex360nm_10nJ_50ns.img"
+    label: "bcf5g_ir, 200cm, 50ns, 2026-04-21"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "200cm"
+    distance_cm: 200
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-04-21"
+    acquisition_date: "4/21/2026"
+    acquisition_time: "2:16:27 PM.677"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "default_on"
+  - include: true
+    path: "2026 04 29/bcf5g_ir/bcf5g_ir_37cmR_ex360nm_10nJ_2ns.img"
+    label: "bcf5g_ir, 37cmr, 2ns, 2026-04-29"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "37cmr"
+    distance_cm: 37
+    replicate: "r"
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-04-29"
+    acquisition_date: "4/29/2026"
+    acquisition_time: "1:35:46 PM.032"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "replicate_or_reverse_orientation"
+  - include: true
+    path: "2026 04 29/bcf5g_ir/bcf5g_ir_37cmR_ex360nm_10nJ_10ns.img"
+    label: "bcf5g_ir, 37cmr, 10ns, 2026-04-29"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "37cmr"
+    distance_cm: 37
+    replicate: "r"
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-29"
+    acquisition_date: "4/29/2026"
+    acquisition_time: "1:52:13 PM.545"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "replicate_or_reverse_orientation"
+  - include: true
+    path: "2026 04 29/bcf5g_ir/bcf5g_ir_37cmR_ex360nm_10nJ_50ns.img"
+    label: "bcf5g_ir, 37cmr, 50ns, 2026-04-29"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "37cmr"
+    distance_cm: 37
+    replicate: "r"
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-04-29"
+    acquisition_date: "4/29/2026"
+    acquisition_time: "2:09:25 PM.770"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "replicate_or_reverse_orientation"
+  - include: true
+    path: "2026 04 29/bcf5g_ir/bcf5g_ir_100cmR_ex360nm_10nJ_2ns.img"
+    label: "bcf5g_ir, 100cmr, 2ns, 2026-04-29"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "100cmr"
+    distance_cm: 100
+    replicate: "r"
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-04-29"
+    acquisition_date: "4/29/2026"
+    acquisition_time: "1:16:57 PM.192"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "replicate_or_reverse_orientation"
+  - include: true
+    path: "2026 04 29/bcf5g_ir/bcf5g_ir_100cmR_ex360nm_10nJ_10ns.img"
+    label: "bcf5g_ir, 100cmr, 10ns, 2026-04-29"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "100cmr"
+    distance_cm: 100
+    replicate: "r"
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-29"
+    acquisition_date: "4/29/2026"
+    acquisition_time: "1:00:09 PM.926"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "replicate_or_reverse_orientation"
+  - include: true
+    path: "2026 04 29/bcf5g_ir/bcf5g_ir_100cmR_ex360nm_10nJ_50ns.img"
+    label: "bcf5g_ir, 100cmr, 50ns, 2026-04-29"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "100cmr"
+    distance_cm: 100
+    replicate: "r"
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-04-29"
+    acquisition_date: "4/29/2026"
+    acquisition_time: "12:39:27 PM.680"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "replicate_or_reverse_orientation"
+  - include: true
+    path: "2026 04 29/bcf5g_ir/bcf5g_ir_200cmR_ex360nm_10nJ_2ns.img"
+    label: "bcf5g_ir, 200cmr, 2ns, 2026-04-29"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "200cmr"
+    distance_cm: 200
+    replicate: "r"
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-04-29"
+    acquisition_date: "4/29/2026"
+    acquisition_time: "12:02:12 PM.900"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "replicate_or_reverse_orientation"
+  - include: true
+    path: "2026 04 29/bcf5g_ir/bcf5g_ir_200cmR_ex360nm_10nJ_10ns.img"
+    label: "bcf5g_ir, 200cmr, 10ns, 2026-04-29"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "200cmr"
+    distance_cm: 200
+    replicate: "r"
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-04-29"
+    acquisition_date: "4/29/2026"
+    acquisition_time: "11:44:59 AM.474"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "replicate_or_reverse_orientation"
+  - include: true
+    path: "2026 04 29/bcf5g_ir/bcf5g_ir_200cmR_ex360nm_10nJ_50ns.img"
+    label: "bcf5g_ir, 200cmr, 50ns, 2026-04-29"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "200cmr"
+    distance_cm: 200
+    replicate: "r"
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-04-29"
+    acquisition_date: "4/29/2026"
+    acquisition_time: "12:19:20 PM.862"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "replicate_or_reverse_orientation"
+  - include: true
+    path: "2026 05 05/bcf5g_ir_100cm_ex360nm_10nJ_2ns.img"
+    label: "bcf5g_ir, 100cm, 2ns, 2026-05-05"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "100cm"
+    distance_cm: 100
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "4:09:50 PM.371"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 2.0
+    visible_time_range_ns: 1.952755905511811
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf5g_ir_100cm_ex360nm_10nJ_10ns.img"
+    label: "bcf5g_ir, 100cm, 10ns, 2026-05-05"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "100cm"
+    distance_cm: 100
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "3:53:11 PM.532"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 10.0
+    visible_time_range_ns: 9.763779527559056
+    note: "default_on"
+  - include: true
+    path: "2026 05 05/bcf5g_ir_100cm_ex360nm_10nJ_50ns.img"
+    label: "bcf5g_ir, 100cm, 50ns, 2026-05-05"
+    sample: "bcf5g"
+    irradiation: "ir"
+    position_token: "100cm"
+    distance_cm: 100
+    replicate: ""
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    measurement_date: "2026-05-05"
+    acquisition_date: "5/5/2026"
+    acquisition_time: "3:20:53 PM.287"
+    rows: 508
+    cols: 672
+    spectrograph_center_nm: 680.0
+    x_scale_nm_per_pixel: 1.0
+    x_start_nm: 344.5
+    x_end_nm: 1015.5
+    time_range_ns: 50.0
+    visible_time_range_ns: 48.818897637795274
+    note: "default_on"

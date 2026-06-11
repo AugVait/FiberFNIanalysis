@@ -5,7 +5,7 @@ group: "bcf5g_ir"
 title: "bcf5g_ir"
 x_min_nm: 400
 x_max_nm: 720
-colormap: "brg"
+colormap: "viridis"
 spectra:
   - include: true
     single: true

@@ -2,6 +2,7 @@
 carpets_config: "carpets.yaml"
 it_decay_config: "it_decay_fits_10ns.yaml"
 pl_config_dir: "pl_spectra"
+fiber_names_config: "fiber_names.yaml"
 run_carpets: true
 run_pl_normalized: true
 run_pl_raw: true

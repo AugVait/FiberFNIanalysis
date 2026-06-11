@@ -17,6 +17,7 @@ from .yaml_config import bool_value, read_yaml_mapping, string_value
 
 
 def config_path(config_root: Path, value: str) -> Path:
+    """Resolve a run-all config path relative to the config root."""
     path = Path(value)
     if path.is_absolute():
         return path
@@ -24,6 +25,7 @@ def config_path(config_root: Path, value: str) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the full reproducible analysis workflow."""
     parser = argparse.ArgumentParser(description="Reproduce all generated analysis results.")
     parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
     parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
@@ -42,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     carpets_config = config_path(config_root, string_value(run_config, "carpets_config", "carpets.yaml"))
     it_decay_config = config_path(config_root, string_value(run_config, "it_decay_config", "it_decay_fits_10ns.yaml"))
     pl_config_dir = config_path(config_root, string_value(run_config, "pl_config_dir", "pl_spectra"))
+    fiber_names_config = config_path(config_root, string_value(run_config, "fiber_names_config", "fiber_names.yaml"))
 
     if not args.skip_raw_check:
         print("Checking raw data before generating results...")
@@ -59,22 +62,44 @@ def main(argv: list[str] | None = None) -> int:
     if bool_value(run_config, "run_carpets", True):
         print()
         print("Generating Hamamatsu carpet visualizations...")
-        visualize_carpets.main(common + ["--config", str(carpets_config)])
+        visualize_carpets.main(
+            common + ["--config", str(carpets_config), "--fiber-names-config", str(fiber_names_config)]
+        )
 
     if bool_value(run_config, "run_pl_normalized", True):
         print()
         print("Generating normalized PL spectra...")
-        plot_pl_spectra.main(common + ["--config-dir", str(pl_config_dir), "--intensity-mode", "normalized"])
+        plot_pl_spectra.main(
+            common
+            + [
+                "--config-dir",
+                str(pl_config_dir),
+                "--fiber-names-config",
+                str(fiber_names_config),
+                "--intensity-mode",
+                "normalized",
+            ]
+        )
 
     if bool_value(run_config, "run_pl_raw", True):
         print()
         print("Generating raw PL spectra...")
-        plot_pl_spectra.main(common + ["--config-dir", str(pl_config_dir), "--intensity-mode", "raw"])
+        plot_pl_spectra.main(
+            common
+            + [
+                "--config-dir",
+                str(pl_config_dir),
+                "--fiber-names-config",
+                str(fiber_names_config),
+                "--intensity-mode",
+                "raw",
+            ]
+        )
 
     if bool_value(run_config, "run_it_decay", True):
         print()
         print("Fitting IT decay traces...")
-        fit_it_decay.main(common + ["--config", str(it_decay_config)])
+        fit_it_decay.main(common + ["--config", str(it_decay_config), "--fiber-names-config", str(fiber_names_config)])
 
     print()
     print(f"All reproducible results written under: {results_dir}")

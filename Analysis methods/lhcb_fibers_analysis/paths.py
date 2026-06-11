@@ -11,11 +11,15 @@ DEFAULT_RESULTS_DIR = PROJECT_ROOT / "Analysis results"
 DEFAULT_CONFIGS_DIR = METHODS_ROOT / "configs"
 DEFAULT_PL_CONFIG_DIR = DEFAULT_CONFIGS_DIR / "pl_spectra"
 DEFAULT_CONFIG_DIR = DEFAULT_PL_CONFIG_DIR
+DEFAULT_CARPET_SCAN_CONFIG_DIR = DEFAULT_CONFIGS_DIR / "carpets"
+DEFAULT_IT_DECAY_TRACE_CONFIG_DIR = DEFAULT_CONFIGS_DIR / "it_decay_fits_10ns"
 DEFAULT_CARPET_CONFIG = DEFAULT_CONFIGS_DIR / "carpets.yaml"
 DEFAULT_IT_DECAY_CONFIG = DEFAULT_CONFIGS_DIR / "it_decay_fits_10ns.yaml"
 DEFAULT_RUN_ALL_CONFIG = DEFAULT_CONFIGS_DIR / "run_all.yaml"
+DEFAULT_FIBER_NAMES_CONFIG = DEFAULT_CONFIGS_DIR / "fiber_names.yaml"
 DEFAULT_MANIFEST = METHODS_ROOT / "raw_data_manifest.json"
 
 
 def resolve_path(path: str | Path) -> Path:
+    """Expand and resolve a filesystem path."""
     return Path(path).expanduser().resolve()

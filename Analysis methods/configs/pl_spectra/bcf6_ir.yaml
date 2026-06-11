@@ -5,7 +5,7 @@ group: "bcf6_ir"
 title: "bcf6_ir"
 x_min_nm: 400
 x_max_nm: 720
-colormap: "brg"
+colormap: "viridis"
 spectra:
   - include: false
     single: true

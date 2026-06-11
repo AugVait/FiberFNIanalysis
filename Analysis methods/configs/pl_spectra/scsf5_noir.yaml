@@ -5,7 +5,7 @@ group: "scsf5_noir"
 title: "scsf5_noir"
 x_min_nm: 400
 x_max_nm: 720
-colormap: "brg"
+colormap: "viridis"
 spectra:
   - include: false
     single: true

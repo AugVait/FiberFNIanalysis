@@ -49,8 +49,11 @@ Run all current analyses:
 The run is controlled by YAML files under `configs`:
 
 - `configs/run_all.yaml`: selects which analysis families run.
-- `configs/carpets.yaml`: Hamamatsu carpet visualization settings.
-- `configs/it_decay_fits_10ns.yaml`: IT decay fitting settings.
+- `configs/fiber_names.yaml`: maps experimental result names to real fiber names used in generated plot labels and tables.
+- `configs/carpets.yaml`: Hamamatsu carpet visualization settings and pointer to detailed scan configs.
+- `configs/carpets/*.yaml`: sample-wise streak-camera scan membership and metadata.
+- `configs/it_decay_fits_10ns.yaml`: IT decay fitting settings and pointer to detailed trace configs.
+- `configs/it_decay_fits_10ns/*.yaml`: sample-wise integrated-time trace membership and metadata.
 - `configs/pl_spectra/*.yaml`: PL spectrum plotting selections.
 
 Outputs are written under `../Analysis results`:
@@ -66,4 +69,19 @@ Outputs are written under `../Analysis results`:
 - Numeric `cm` tokens are fiber positions in centimeters relative to the non-metalized end.
 - `ENDcm` is an endpoint condition, not a numeric distance.
 - `cm1` and `cm2` suffixes are replicate labels at the same distance.
+- Real fiber names are display metadata only; raw-data paths and YAML selection keys continue to use experimental names.
 - Preserve the distinction between raw `.TXT` spectra, converted `_calc.txt` spectra, `.img` carpets, and derived `.dat` or `DC_` files.
+
+## Manual Carpet Wavelength Cuts
+
+Use this helper for one-off streak-carpet inspection outside `run_all`. It loads one `.img`, averages wavelength bands at regular centers, detects secondary peaks, fits a single exponential decay to the dominant peak while excluding later secondary peaks, and writes CSV/PNG diagnostics:
+
+```powershell
+.\.venv\Scripts\python.exe -m lhcb_fibers_analysis.carpet_wavelength_cuts `
+  "..\raw data\2026 04 17\bcf_6\bcf6_ir_100cm_ex360nm_10nJ_10ns.img" `
+  --wavelength-min-nm 400 --wavelength-max-nm 540 `
+  --step-nm 10 --band-width-nm 10 `
+  --fit-start-offset-ns 0.05
+```
+
+Main outputs are `fit_summary.csv`, `cut_profiles.csv`, `tau_vs_wavelength.png`, `profiles_overlay.png`, `carpet_with_cuts.png`, and optional per-cut fit PNGs under `fits/`.

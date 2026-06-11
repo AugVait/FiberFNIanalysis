@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 def parse_yaml_scalar(value: str) -> object:
+    """Parse a scalar value from the small YAML config format."""
     text = value.strip()
     if text.lower() == "true":
         return True
@@ -46,21 +47,25 @@ def read_yaml_mapping(path: Path) -> dict[str, object]:
 
 
 def string_value(values: dict[str, object], key: str, default: str) -> str:
+    """Document the string_value helper."""
     value = values.get(key, default)
     return str(value)
 
 
 def int_value(values: dict[str, object], key: str, default: int) -> int:
+    """Document the int_value helper."""
     value = values.get(key, default)
     return int(value)
 
 
 def float_value(values: dict[str, object], key: str, default: float) -> float:
+    """Document the float_value helper."""
     value = values.get(key, default)
     return float(value)
 
 
 def bool_value(values: dict[str, object], key: str, default: bool) -> bool:
+    """Document the bool_value helper."""
     value = values.get(key, default)
     if isinstance(value, bool):
         return value

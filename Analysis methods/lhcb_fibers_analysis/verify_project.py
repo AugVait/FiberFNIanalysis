@@ -10,6 +10,7 @@ from .verify_environment import check_environment
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run project and raw-data verification checks."""
     parser = argparse.ArgumentParser(
         description="Check Python dependencies and verify local raw data against the tracked manifest."
     )
