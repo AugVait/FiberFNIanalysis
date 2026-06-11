@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .yaml_config import parse_yaml_scalar, yaml_scalar
+
 
 @dataclass(frozen=True)
 class SectionConfig:
@@ -19,44 +21,6 @@ class SectionConfig:
     def title(self) -> str:
         """Return the config display title."""
         return str(self.top.get("title", self.group))
-
-
-def yaml_quote(value: object) -> str:
-    """Quote a value for the small YAML files used by the analyses."""
-    text = "" if value is None else str(value)
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-
-def yaml_scalar(value: object) -> str:
-    """Format a scalar value for the small YAML config files."""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return str(value)
-    return yaml_quote(value)
-
-
-def parse_yaml_scalar(value: str) -> object:
-    """Parse a scalar value from the small YAML config format."""
-    text = value.strip()
-    if text.lower() == "true":
-        return True
-    if text.lower() == "false":
-        return False
-    if text in {"", "null", "None"}:
-        return ""
-    if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
-        return text[1:-1].replace('\\"', '"').replace("\\\\", "\\")
-    if len(text) >= 2 and text[0] == "'" and text[-1] == "'":
-        return text[1:-1].replace("''", "'")
-    try:
-        return int(text)
-    except ValueError:
-        pass
-    try:
-        return float(text)
-    except ValueError:
-        return text
 
 
 def read_section_config(path: Path, list_key: str) -> SectionConfig:

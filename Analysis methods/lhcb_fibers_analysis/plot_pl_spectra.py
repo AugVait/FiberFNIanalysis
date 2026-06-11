@@ -32,6 +32,8 @@ from .plot_style import (
     set_publication_style,
     style_colorbar,
 )
+from .scan_config import SectionConfig, configs_exist, read_section_configs
+from .yaml_config import yaml_scalar
 
 SPECTRAL_XLIM_NM = (400, 720)
 INTENSITY_MODES = ("normalized", "raw")
@@ -135,104 +137,25 @@ def safe_output_stem(path: Path, root: Path) -> str:
     return f"{safe_stem}_{digest}"
 
 
-def yaml_quote(value: object) -> str:
-    """Quote a value for the small YAML files used by the analyses."""
-    text = "" if value is None else str(value)
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-
-def yaml_scalar(value: object) -> str:
-    """Format a scalar value for the small YAML config files."""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return str(value)
-    return yaml_quote(value)
-
-
-def parse_yaml_scalar(value: str) -> object:
-    """Parse a scalar value from the small YAML config format."""
-    text = value.strip()
-    if text.lower() == "true":
-        return True
-    if text.lower() == "false":
-        return False
-    if text in {"", "null", "None"}:
-        return ""
-    if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
-        return text[1:-1].replace('\\"', '"').replace("\\\\", "\\")
-    if len(text) >= 2 and text[0] == "'" and text[-1] == "'":
-        return text[1:-1].replace("''", "'")
-    try:
-        return int(text)
-    except ValueError:
-        pass
-    try:
-        return float(text)
-    except ValueError:
-        return text
-
-
-def read_plot_config(path: Path) -> PlotConfig:
-    """Read one PL spectrum plotting config file."""
-    top: dict[str, object] = {}
-    spectra: list[dict[str, object]] = []
-    current: dict[str, object] | None = None
-    in_spectra = False
-
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.rstrip()
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-
-        if not line.startswith(" "):
-            if current is not None:
-                spectra.append(current)
-                current = None
-            key, _, value = stripped.partition(":")
-            if key == "spectra":
-                in_spectra = True
-                continue
-            top[key] = parse_yaml_scalar(value)
-            in_spectra = False
-            continue
-
-        if not in_spectra:
-            continue
-
-        if stripped.startswith("- "):
-            if current is not None:
-                spectra.append(current)
-            current = {}
-            remainder = stripped[2:].strip()
-            if remainder:
-                key, _, value = remainder.partition(":")
-                current[key.strip()] = parse_yaml_scalar(value)
-            continue
-
-        if current is not None and ":" in stripped:
-            key, _, value = stripped.partition(":")
-            current[key.strip()] = parse_yaml_scalar(value)
-
-    if current is not None:
-        spectra.append(current)
-
-    group = str(top.get("group", path.stem))
-    x_min = float(top.get("x_min_nm", SPECTRAL_XLIM_NM[0]))
-    x_max = float(top.get("x_max_nm", SPECTRAL_XLIM_NM[1]))
+def plot_config_from_section(section: SectionConfig) -> PlotConfig:
+    """Convert a generic section config into PL plotting settings."""
+    x_min = float(section.top.get("x_min_nm", SPECTRAL_XLIM_NM[0]))
+    x_max = float(section.top.get("x_max_nm", SPECTRAL_XLIM_NM[1]))
     return PlotConfig(
-        group=group,
-        title=str(top.get("title", group)),
+        group=section.group,
+        title=section.title,
         xlim_nm=(x_min, x_max),
-        colormap=str(top.get("colormap", SEQUENTIAL_CMAP)),
-        spectra=spectra,
+        colormap=str(section.top.get("colormap", SEQUENTIAL_CMAP)),
+        spectra=section.entries,
     )
 
 
 def read_plot_configs(config_dir: Path) -> list[PlotConfig]:
     """Read all PL spectrum plotting configs in a directory."""
-    return [read_plot_config(path) for path in sorted(config_dir.glob("*.yaml"))]
+    return [
+        plot_config_from_section(section)
+        for section in read_section_configs(config_dir, "spectra")
+    ]
 
 
 def find_column(columns: list[str], predicate) -> str | None:
@@ -533,11 +456,6 @@ def write_plot_configs(records: list[PLSpectrum], config_dir: Path) -> None:
                 ]
             )
         (config_dir / f"{group}.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def configs_exist(config_dir: Path) -> bool:
-    """Return whether a config directory contains YAML files."""
-    return config_dir.exists() and any(config_dir.glob("*.yaml"))
 
 
 def selected_records_from_configs(

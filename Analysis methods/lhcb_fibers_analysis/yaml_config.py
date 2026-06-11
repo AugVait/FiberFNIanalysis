@@ -3,6 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def yaml_quote(value: object) -> str:
+    """Quote a value for the small YAML files used by the analyses."""
+    text = "" if value is None else str(value)
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def yaml_scalar(value: object) -> str:
+    """Format a scalar value for the small YAML config files."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)
+    return yaml_quote(value)
+
+
 def parse_yaml_scalar(value: str) -> object:
     """Parse a scalar value from the small YAML config format."""
     text = value.strip()
@@ -47,25 +62,25 @@ def read_yaml_mapping(path: Path) -> dict[str, object]:
 
 
 def string_value(values: dict[str, object], key: str, default: str) -> str:
-    """Document the string_value helper."""
+    """Return a config value as a string, or the default if missing."""
     value = values.get(key, default)
     return str(value)
 
 
 def int_value(values: dict[str, object], key: str, default: int) -> int:
-    """Document the int_value helper."""
+    """Return a config value as an integer, or the default if missing."""
     value = values.get(key, default)
     return int(value)
 
 
 def float_value(values: dict[str, object], key: str, default: float) -> float:
-    """Document the float_value helper."""
+    """Return a config value as a float, or the default if missing."""
     value = values.get(key, default)
     return float(value)
 
 
 def bool_value(values: dict[str, object], key: str, default: bool) -> bool:
-    """Document the bool_value helper."""
+    """Return a config value as a boolean, or the default if missing."""
     value = values.get(key, default)
     if isinstance(value, bool):
         return value
