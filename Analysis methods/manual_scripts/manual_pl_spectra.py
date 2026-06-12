@@ -1,7 +1,13 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from manual_common import (
+    CONFIGS_DIR,
+    FIBER_NAMES_CONFIG,
+    add_flag,
+    add_optional,
+    common_analysis_args,
+    use_methods_package,
+)
 
 
 # =========================
@@ -10,15 +16,11 @@ from pathlib import Path
 # Edit values in this block, then run this file directly from Python.
 # No command-line arguments are needed.
 
-METHODS_DIR = Path(__file__).resolve().parents[1]
-PROJECT_ROOT = METHODS_DIR.parent
-
-RAW_DIR = PROJECT_ROOT / "raw data"
-RESULTS_DIR = PROJECT_ROOT / "Analysis results"
-CONFIG_DIR = METHODS_DIR / "configs" / "pl_spectra"
-FIBER_NAMES_CONFIG = METHODS_DIR / "configs" / "fiber_names.yaml"
+CONFIG_DIR = CONFIGS_DIR / "pl_spectra"
 
 INTENSITY_MODES = ("normalized", "raw")
+X_MIN_NM = None
+X_MAX_NM = None
 REFRESH_CONFIGS = False
 NO_CLEAN = False
 
@@ -28,22 +30,25 @@ OUT_SUBDIR_BY_MODE = {
     "raw": None,
 }
 
+# Examples:
+# INTENSITY_MODES = ("normalized",)
+# X_MIN_NM = 400.0
+# X_MAX_NM = 650.0
+# OUT_SUBDIR_BY_MODE = {"normalized": "pl_spectra_400_650", "raw": None}
+# NO_CLEAN = True
+
 
 # =========================
 # Script body
 # =========================
 
-sys.path.insert(0, str(METHODS_DIR))
+use_methods_package()
 
 from lhcb_fibers_analysis import plot_pl_spectra  # noqa: E402
 
 
 def run_mode(intensity_mode: str) -> None:
-    args = [
-        "--raw-dir",
-        str(RAW_DIR),
-        "--results-dir",
-        str(RESULTS_DIR),
+    args = common_analysis_args() + [
         "--config-dir",
         str(CONFIG_DIR),
         "--fiber-names-config",
@@ -51,13 +56,12 @@ def run_mode(intensity_mode: str) -> None:
         "--intensity-mode",
         intensity_mode,
     ]
+    add_optional(args, "--x-min-nm", X_MIN_NM)
+    add_optional(args, "--x-max-nm", X_MAX_NM)
     out_subdir = OUT_SUBDIR_BY_MODE.get(intensity_mode)
-    if out_subdir is not None:
-        args.extend(["--out-subdir", str(out_subdir)])
-    if REFRESH_CONFIGS:
-        args.append("--refresh-configs")
-    if NO_CLEAN:
-        args.append("--no-clean")
+    add_optional(args, "--out-subdir", out_subdir)
+    add_flag(args, "--refresh-configs", REFRESH_CONFIGS)
+    add_flag(args, "--no-clean", NO_CLEAN)
     plot_pl_spectra.main(args)
 
 

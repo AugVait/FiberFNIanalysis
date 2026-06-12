@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from manual_common import PROJECT_ROOT, add_flag, add_optional, use_methods_package
 
 
 # =========================
@@ -9,9 +8,6 @@ from pathlib import Path
 # =========================
 # Edit values in this block, then run this file directly from Python.
 # No command-line arguments are needed.
-
-METHODS_DIR = Path(__file__).resolve().parents[1]
-PROJECT_ROOT = METHODS_DIR.parent
 
 IMG_PATH = (
     PROJECT_ROOT
@@ -50,19 +46,25 @@ TAU_MAX_NS = 200.0
 
 WRITE_INDIVIDUAL_PLOTS = True
 
+# Examples:
+# CENTERS_NM = (420, 440, 460, 480, 500)
+# WAVELENGTH_MIN_NM = 380.0
+# WAVELENGTH_MAX_NM = 620.0
+# STEP_NM = 20.0
+# BAND_WIDTH_NM = 20.0
+# FIT_START_NS = 1.6
+# FIT_END_NS = 7.5
+# OUT_DIR = PROJECT_ROOT / "Analysis results" / "manual_carpet_wavelength_cuts" / "bcf6_100cm_selected"
+# WRITE_INDIVIDUAL_PLOTS = False
+
 
 # =========================
 # Script body
 # =========================
 
-sys.path.insert(0, str(METHODS_DIR))
+use_methods_package()
 
 from lhcb_fibers_analysis import carpet_wavelength_cuts  # noqa: E402
-
-
-def optional_arg(args: list[str], name: str, value: object) -> None:
-    if value is not None:
-        args.extend([name, str(value)])
 
 
 def main() -> None:
@@ -99,16 +101,15 @@ def main() -> None:
         "--tau-max-ns",
         str(TAU_MAX_NS),
     ]
-    optional_arg(args, "--out-dir", OUT_DIR)
-    optional_arg(args, "--wavelength-min-nm", WAVELENGTH_MIN_NM)
-    optional_arg(args, "--wavelength-max-nm", WAVELENGTH_MAX_NM)
-    optional_arg(args, "--fit-start-ns", FIT_START_NS)
-    optional_arg(args, "--fit-end-ns", FIT_END_NS)
+    add_optional(args, "--out-dir", OUT_DIR)
+    add_optional(args, "--wavelength-min-nm", WAVELENGTH_MIN_NM)
+    add_optional(args, "--wavelength-max-nm", WAVELENGTH_MAX_NM)
+    add_optional(args, "--fit-start-ns", FIT_START_NS)
+    add_optional(args, "--fit-end-ns", FIT_END_NS)
     if CENTERS_NM is not None:
         centers_text = ",".join(str(center) for center in CENTERS_NM)
         args.extend(["--centers", centers_text])
-    if not WRITE_INDIVIDUAL_PLOTS:
-        args.append("--no-individual-plots")
+    add_flag(args, "--no-individual-plots", not WRITE_INDIVIDUAL_PLOTS)
     carpet_wavelength_cuts.main(args)
 
 

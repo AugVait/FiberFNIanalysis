@@ -62,8 +62,10 @@ Each individual command also accepts a config flag:
 
 - `visualize_carpets --config configs\carpets.yaml`
 - `visualize_carpets --fiber-names-config configs\fiber_names.yaml`
+- `visualize_carpets --time-window 10ns`
 - `plot_pl_spectra --config-dir configs\pl_spectra`
 - `plot_pl_spectra --fiber-names-config configs\fiber_names.yaml`
+- `plot_pl_spectra --x-min-nm 400 --x-max-nm 720`
 - `fit_it_decay --config configs\it_decay_fits_10ns.yaml`
 - `fit_it_decay --fiber-names-config configs\fiber_names.yaml`
 

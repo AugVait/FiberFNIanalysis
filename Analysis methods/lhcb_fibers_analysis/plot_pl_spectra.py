@@ -5,7 +5,7 @@ import csv
 import hashlib
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import matplotlib
@@ -156,6 +156,25 @@ def read_plot_configs(config_dir: Path) -> list[PlotConfig]:
         plot_config_from_section(section)
         for section in read_section_configs(config_dir, "spectra")
     ]
+
+
+def override_plot_xlimits(
+    configs: list[PlotConfig],
+    x_min_nm: float | None,
+    x_max_nm: float | None,
+) -> list[PlotConfig]:
+    """Return plot configs with optional command-line wavelength-axis overrides."""
+    if x_min_nm is None and x_max_nm is None:
+        return configs
+
+    updated = []
+    for config in configs:
+        x_min = config.xlim_nm[0] if x_min_nm is None else x_min_nm
+        x_max = config.xlim_nm[1] if x_max_nm is None else x_max_nm
+        if x_max <= x_min:
+            raise ValueError(f"PL x-axis maximum must be greater than minimum for {config.group}: {x_min} >= {x_max}")
+        updated.append(replace(config, xlim_nm=(x_min, x_max)))
+    return updated
 
 
 def find_column(columns: list[str], predicate) -> str | None:
@@ -730,6 +749,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--config-dir", type=Path, default=DEFAULT_CONFIG_DIR)
     parser.add_argument("--fiber-names-config", type=Path, default=DEFAULT_FIBER_NAMES_CONFIG)
     parser.add_argument("--intensity-mode", choices=INTENSITY_MODES, default="normalized")
+    parser.add_argument("--x-min-nm", type=float, default=None, help="Override the configured PL plot x-axis minimum.")
+    parser.add_argument("--x-max-nm", type=float, default=None, help="Override the configured PL plot x-axis maximum.")
     parser.add_argument("--refresh-configs", action="store_true", help="Rewrite YAML plot configs from the discovered *_calc.txt files.")
     parser.add_argument("--no-clean", action="store_true", help="Do not remove existing generated plots before writing.")
     args = parser.parse_args(argv)
@@ -756,7 +777,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.refresh_configs or not configs_exist(config_dir):
         write_plot_configs(discovered_records, config_dir)
 
-    configs = read_plot_configs(config_dir)
+    configs = override_plot_xlimits(read_plot_configs(config_dir), args.x_min_nm, args.x_max_nm)
     if not configs:
         raise SystemExit(f"No YAML plot configs found in {config_dir}")
 

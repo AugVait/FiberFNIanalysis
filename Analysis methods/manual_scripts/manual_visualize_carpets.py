@@ -1,7 +1,14 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from manual_common import (
+    CONFIGS_DIR,
+    FIBER_NAMES_CONFIG,
+    add_flag,
+    add_optional,
+    add_repeated,
+    common_analysis_args,
+    use_methods_package,
+)
 
 
 # =========================
@@ -10,45 +17,40 @@ from pathlib import Path
 # Edit values in this block, then run this file directly from Python.
 # No command-line arguments are needed.
 
-METHODS_DIR = Path(__file__).resolve().parents[1]
-PROJECT_ROOT = METHODS_DIR.parent
-
-RAW_DIR = PROJECT_ROOT / "raw data"
-RESULTS_DIR = PROJECT_ROOT / "Analysis results"
-CONFIG = METHODS_DIR / "configs" / "carpets.yaml"
+CONFIG = CONFIGS_DIR / "carpets.yaml"
 SCAN_CONFIG_DIR = None
-FIBER_NAMES_CONFIG = METHODS_DIR / "configs" / "fiber_names.yaml"
 OUT_SUBDIR = None
+TIME_WINDOWS = None
 
 REFRESH_CONFIGS = False
+
+# Examples:
+# TIME_WINDOWS = ("10ns",)
+# TIME_WINDOWS = ("2ns", "10ns")
+# OUT_SUBDIR = "carpets_10ns_only"
+# REFRESH_CONFIGS = True
 
 
 # =========================
 # Script body
 # =========================
 
-sys.path.insert(0, str(METHODS_DIR))
+use_methods_package()
 
 from lhcb_fibers_analysis import visualize_carpets  # noqa: E402
 
 
 def main() -> None:
-    args = [
-        "--raw-dir",
-        str(RAW_DIR),
-        "--results-dir",
-        str(RESULTS_DIR),
+    args = common_analysis_args() + [
         "--config",
         str(CONFIG),
         "--fiber-names-config",
         str(FIBER_NAMES_CONFIG),
     ]
-    if SCAN_CONFIG_DIR is not None:
-        args.extend(["--scan-config-dir", str(SCAN_CONFIG_DIR)])
-    if OUT_SUBDIR is not None:
-        args.extend(["--out-subdir", str(OUT_SUBDIR)])
-    if REFRESH_CONFIGS:
-        args.append("--refresh-configs")
+    add_optional(args, "--scan-config-dir", SCAN_CONFIG_DIR)
+    add_optional(args, "--out-subdir", OUT_SUBDIR)
+    add_repeated(args, "--time-window", TIME_WINDOWS)
+    add_flag(args, "--refresh-configs", REFRESH_CONFIGS)
     visualize_carpets.main(args)
 
 

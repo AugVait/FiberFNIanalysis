@@ -1,9 +1,9 @@
 # Map experimental result names to real fiber names.
 # Leave a value empty to use the experimental name in generated figures and tables.
 fiber_names:
-  bcf10_noir: ""
-  bcf1_noir: ""
-  bcf5g_ir: ""
-  bcf6_ir: ""
-  scsf2_ir: ""
-  scsf5_noir: ""
+  bcf10_noir: "BCF-20 Non-IR"
+  bcf1_noir: "BCF-12 Non-IR"
+  bcf5g_ir: "BCF-20 IR"
+  bcf6_ir: "BCF-12 IR"
+  scsf2_ir: "SCSF-78 IR"
+  scsf5_noir: "SCSF-78 Non-IR"

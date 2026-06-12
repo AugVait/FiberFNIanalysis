@@ -46,6 +46,16 @@ Run all current analyses:
 .\.venv\Scripts\python.exe -m lhcb_fibers_analysis.run_all --raw-dir "..\raw data" --results-dir "..\Analysis results"
 ```
 
+Optional run controls can be passed on the command line:
+
+```powershell
+.\.venv\Scripts\python.exe -m lhcb_fibers_analysis.run_all `
+  --raw-dir "..\raw data" --results-dir "..\Analysis results" `
+  --carpet-time-window 10ns `
+  --it-time-window 10ns `
+  --pl-x-min-nm 400 --pl-x-max-nm 720
+```
+
 The run is controlled by YAML files under `configs`:
 
 - `configs/run_all.yaml`: selects which analysis families run.

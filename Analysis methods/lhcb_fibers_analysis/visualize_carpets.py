@@ -152,6 +152,26 @@ def sort_key(record: CarpetRecord) -> tuple:
     )
 
 
+def parse_time_window_filters(values: list[str] | None) -> set[str] | None:
+    """Parse repeated or comma-separated acquisition-window filters."""
+    if not values:
+        return None
+    windows = {
+        item.strip().lower()
+        for value in values
+        for item in value.split(",")
+        if item.strip()
+    }
+    return windows or None
+
+
+def filter_by_time_windows(records: list[CarpetRecord], time_windows: set[str] | None) -> list[CarpetRecord]:
+    """Keep only carpet records whose acquisition time window is selected."""
+    if time_windows is None:
+        return records
+    return [record for record in records if record.time_window.lower() in time_windows]
+
+
 def scaled_core_image(data: np.ndarray, config: CarpetConfig) -> np.ndarray:
     """Return an asinh-scaled carpet image after background subtraction."""
     arr = data.astype(np.float32)
@@ -631,6 +651,14 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--scan-config-dir", type=Path, default=None)
     parser.add_argument("--fiber-names-config", type=Path, default=DEFAULT_FIBER_NAMES_CONFIG)
     parser.add_argument("--out-subdir", type=Path, default=None)
+    parser.add_argument(
+        "--time-window",
+        "--time-windows",
+        dest="time_windows",
+        action="append",
+        default=None,
+        help="Keep only selected carpet acquisition windows. Repeat or use commas, e.g. --time-window 10ns or --time-windows 2ns,10ns.",
+    )
     parser.add_argument("--refresh-configs", action="store_true", help="Rewrite per-sample carpet scan configs.")
     args = parser.parse_args(argv)
 
@@ -647,12 +675,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     out_subdir = args.out_subdir or Path(config.out_subdir)
     out_dir = (results_dir / out_subdir).resolve()
+    time_window_filters = parse_time_window_filters(args.time_windows)
     discovered_records = load_records(raw_dir, out_dir)
     if not discovered_records:
         raise SystemExit("No .img carpets found.")
 
     if args.refresh_configs or not configs_exist(scan_config_dir):
-        write_scan_configs(discovered_records, scan_config_dir, config)
+        write_scan_configs(filter_by_time_windows(discovered_records, time_window_filters), scan_config_dir, config)
 
     scan_configs = read_section_configs(scan_config_dir, "scans")
     if not scan_configs:
@@ -662,9 +691,19 @@ def main(argv: list[str] | None = None) -> None:
     selected_records, selected_record_paths, configured_record_paths = selected_records_from_configs(
         scan_configs, records_by_path
     )
-    records = [record for record in discovered_records if record.path in configured_record_paths]
+    records = filter_by_time_windows(
+        [record for record in discovered_records if record.path in configured_record_paths],
+        time_window_filters,
+    )
+    selected_records = filter_by_time_windows(selected_records, time_window_filters)
+    selected_record_paths = {record.path for record in selected_records}
     if not selected_records:
-        raise SystemExit(f"No carpet scans are selected in {scan_config_dir}")
+        filter_note = (
+            ""
+            if time_window_filters is None
+            else f" for time window(s): {', '.join(sorted(time_window_filters))}"
+        )
+        raise SystemExit(f"No carpet scans are selected in {scan_config_dir}{filter_note}")
 
     for record in selected_records:
         save_individual(record, config, fiber_names)
@@ -701,6 +740,8 @@ def main(argv: list[str] | None = None) -> None:
         selected_groups[record.group] += 1
     print(f"loaded carpets: {len(records)} configured")
     print(f"selected carpets: {len(selected_records)}")
+    if time_window_filters is not None:
+        print(f"time-window filter: {', '.join(sorted(time_window_filters))}")
     print("groups:")
     for group, count in sorted(groups.items()):
         print(f"  {fiber_names.real_name(group)} ({group}): {selected_groups.get(group, 0)} selected / {count} listed")
