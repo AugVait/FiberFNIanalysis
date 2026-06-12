@@ -7,6 +7,7 @@ from manual_common import (
     add_optional,
     add_repeated,
     common_analysis_args,
+    show_settings,
     use_methods_package,
 )
 
@@ -14,8 +15,8 @@ from manual_common import (
 # =========================
 # Manual analysis preamble
 # =========================
-# Edit values in this block, then run this file directly from Python.
-# No command-line arguments are needed.
+# Edit values in this block, then run this file directly.
+# Use None to keep the normal project defaults.
 
 MANIFEST = METHODS_DIR / "raw_data_manifest.json"
 RUN_CONFIG = CONFIGS_DIR / "run_all.yaml"
@@ -45,6 +46,18 @@ from lhcb_fibers_analysis import run_all  # noqa: E402
 
 
 def main() -> int:
+    show_settings(
+        "Manual full analysis",
+        [
+            ("raw data", "raw data"),
+            ("results", "Analysis results"),
+            ("carpet windows", CARPET_TIME_WINDOWS),
+            ("IT window", IT_TIME_WINDOW),
+            ("PL x min nm", PL_X_MIN_NM),
+            ("PL x max nm", PL_X_MAX_NM),
+            ("skip raw check", SKIP_RAW_CHECK),
+        ],
+    )
     args = common_analysis_args() + [
         "--manifest",
         str(MANIFEST),

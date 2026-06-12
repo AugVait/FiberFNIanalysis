@@ -35,6 +35,16 @@ The raw-data check must pass before reproducing results. For the current manifes
 
 ## 4. Rebuild All Results
 
+The most convenient route is the manual wrapper script:
+
+```powershell
+.\.venv\Scripts\python.exe .\manual_scripts\manual_run_all.py
+```
+
+It prints the selected paths and optional filters before running. Edit the preamble at the top of the script when you want to restrict carpet windows, change the IT window, or adjust PL wavelength limits.
+
+The equivalent command-line route is:
+
 ```powershell
 .\.venv\Scripts\python.exe -m lhcb_fibers_analysis.run_all --raw-dir "..\raw data" --results-dir "..\Analysis results"
 ```
@@ -48,6 +58,17 @@ Expected generated result folders:
 - `..\Analysis results\pl_spectra`
 - `..\Analysis results\pl_spectra_raw`
 - `..\Analysis results\it_decay_fits_10ns`
+
+## Individual Manual Scripts
+
+Use these when you only want one analysis family:
+
+```powershell
+.\.venv\Scripts\python.exe .\manual_scripts\manual_visualize_carpets.py
+.\.venv\Scripts\python.exe .\manual_scripts\manual_pl_spectra.py
+.\.venv\Scripts\python.exe .\manual_scripts\manual_fit_it_decay.py
+.\.venv\Scripts\python.exe .\manual_scripts\manual_carpet_wavelength_cuts.py
+```
 
 ## Individual Commands
 

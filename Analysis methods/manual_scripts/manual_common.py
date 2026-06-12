@@ -13,6 +13,25 @@ CONFIGS_DIR = METHODS_DIR / "configs"
 FIBER_NAMES_CONFIG = CONFIGS_DIR / "fiber_names.yaml"
 
 
+def display_value(value: object) -> str:
+    """Format an editable setting for a short run summary."""
+    if value is None or value == "":
+        return "default"
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value) or "default"
+    return str(value)
+
+
+def show_settings(title: str, settings: Iterable[tuple[str, object]]) -> None:
+    """Print the important manual settings before a script starts work."""
+    print()
+    print(title)
+    print("-" * len(title))
+    for name, value in settings:
+        print(f"{name}: {display_value(value)}")
+    print()
+
+
 def common_analysis_args() -> list[str]:
     """Return raw/results arguments shared by the manual analysis scripts."""
     return ["--raw-dir", str(RAW_DIR), "--results-dir", str(RESULTS_DIR)]

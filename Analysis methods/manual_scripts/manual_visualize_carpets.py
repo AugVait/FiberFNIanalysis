@@ -7,6 +7,7 @@ from manual_common import (
     add_optional,
     add_repeated,
     common_analysis_args,
+    show_settings,
     use_methods_package,
 )
 
@@ -14,8 +15,8 @@ from manual_common import (
 # =========================
 # Manual analysis preamble
 # =========================
-# Edit values in this block, then run this file directly from Python.
-# No command-line arguments are needed.
+# Edit values in this block, then run this file directly.
+# Use None to keep the normal project defaults.
 
 CONFIG = CONFIGS_DIR / "carpets.yaml"
 SCAN_CONFIG_DIR = None
@@ -41,6 +42,14 @@ from lhcb_fibers_analysis import visualize_carpets  # noqa: E402
 
 
 def main() -> None:
+    show_settings(
+        "Manual carpet quicklooks",
+        [
+            ("time windows", TIME_WINDOWS),
+            ("output folder", OUT_SUBDIR),
+            ("refresh configs", REFRESH_CONFIGS),
+        ],
+    )
     args = common_analysis_args() + [
         "--config",
         str(CONFIG),

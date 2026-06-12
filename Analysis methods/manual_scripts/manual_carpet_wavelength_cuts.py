@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from manual_common import PROJECT_ROOT, add_flag, add_optional, use_methods_package
+from manual_common import PROJECT_ROOT, add_flag, add_optional, show_settings, use_methods_package
 
 
 # =========================
 # Manual analysis preamble
 # =========================
-# Edit values in this block, then run this file directly from Python.
-# No command-line arguments are needed.
+# Edit values in this block, then run this file directly.
+# Use None to keep the normal project defaults.
 
 IMG_PATH = (
     PROJECT_ROOT
@@ -68,6 +68,20 @@ from lhcb_fibers_analysis import carpet_wavelength_cuts  # noqa: E402
 
 
 def main() -> None:
+    show_settings(
+        "Manual carpet wavelength cuts",
+        [
+            ("image", IMG_PATH),
+            ("centers nm", CENTERS_NM),
+            ("wavelength min nm", WAVELENGTH_MIN_NM),
+            ("wavelength max nm", WAVELENGTH_MAX_NM),
+            ("step nm", STEP_NM),
+            ("band width nm", BAND_WIDTH_NM),
+            ("fit start ns", FIT_START_NS),
+            ("fit end ns", FIT_END_NS),
+            ("write individual plots", WRITE_INDIVIDUAL_PLOTS),
+        ],
+    )
     args = [
         str(IMG_PATH),
         "--top-edge-crop-rows",

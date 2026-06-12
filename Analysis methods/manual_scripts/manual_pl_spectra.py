@@ -6,6 +6,7 @@ from manual_common import (
     add_flag,
     add_optional,
     common_analysis_args,
+    show_settings,
     use_methods_package,
 )
 
@@ -13,8 +14,8 @@ from manual_common import (
 # =========================
 # Manual analysis preamble
 # =========================
-# Edit values in this block, then run this file directly from Python.
-# No command-line arguments are needed.
+# Edit values in this block, then run this file directly.
+# Use None to keep the normal project defaults.
 
 CONFIG_DIR = CONFIGS_DIR / "pl_spectra"
 
@@ -66,6 +67,16 @@ def run_mode(intensity_mode: str) -> None:
 
 
 def main() -> None:
+    show_settings(
+        "Manual PL spectra",
+        [
+            ("modes", INTENSITY_MODES),
+            ("x min nm", X_MIN_NM),
+            ("x max nm", X_MAX_NM),
+            ("refresh configs", REFRESH_CONFIGS),
+            ("keep old outputs", NO_CLEAN),
+        ],
+    )
     for intensity_mode in INTENSITY_MODES:
         run_mode(intensity_mode)
 

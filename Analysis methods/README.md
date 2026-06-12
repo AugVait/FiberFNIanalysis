@@ -40,7 +40,13 @@ Commit the updated `raw_data_manifest.json` with the analysis-method changes tha
 
 ## Reproduce Results
 
-Run all current analyses:
+For routine use, prefer the manual script. It has an editable preamble at the top and prints the selected settings before it starts:
+
+```powershell
+.\.venv\Scripts\python.exe .\manual_scripts\manual_run_all.py
+```
+
+The command-line entry point is still available for automation:
 
 ```powershell
 .\.venv\Scripts\python.exe -m lhcb_fibers_analysis.run_all --raw-dir "..\raw data" --results-dir "..\Analysis results"
@@ -54,6 +60,15 @@ Optional run controls can be passed on the command line:
   --carpet-time-window 10ns `
   --it-time-window 10ns `
   --pl-x-min-nm 400 --pl-x-max-nm 720
+```
+
+The same controls are easier to edit in `manual_scripts/manual_run_all.py`:
+
+```python
+CARPET_TIME_WINDOWS = ("10ns",)
+IT_TIME_WINDOW = "10ns"
+PL_X_MIN_NM = 400.0
+PL_X_MAX_NM = 720.0
 ```
 
 The run is controlled by YAML files under `configs`:
@@ -84,7 +99,9 @@ Outputs are written under `../Analysis results`:
 
 ## Manual Carpet Wavelength Cuts
 
-Use this helper for one-off streak-carpet inspection outside `run_all`. It loads one `.img`, averages wavelength bands at regular centers, detects secondary peaks, fits a single exponential decay to the dominant peak while excluding later secondary peaks, and writes CSV/PNG diagnostics:
+For one-off streak-carpet inspection, edit and run `manual_scripts/manual_carpet_wavelength_cuts.py`. It loads one `.img`, averages wavelength bands at regular centers, detects secondary peaks, fits a single exponential decay to the dominant peak while excluding later secondary peaks, and writes CSV/PNG diagnostics.
+
+The underlying command-line helper is:
 
 ```powershell
 .\.venv\Scripts\python.exe -m lhcb_fibers_analysis.carpet_wavelength_cuts `

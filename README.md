@@ -28,3 +28,11 @@ py -3.12 -m venv .venv
 ```
 
 If the raw-data check fails, the copied data does not match the manifest synced through Git.
+
+After the check passes, the easiest way to rebuild outputs is the manual wrapper:
+
+```powershell
+.\.venv\Scripts\python.exe .\manual_scripts\manual_run_all.py
+```
+
+The manual scripts live in `Analysis methods\manual_scripts`. Edit the preamble at the top of a script when you want a narrower run.
