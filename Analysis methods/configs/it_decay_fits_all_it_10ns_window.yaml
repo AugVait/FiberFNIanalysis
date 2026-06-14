@@ -1,0 +1,20 @@
+# Integrated-time trace decay fitting settings for all IT traces.
+out_subdir: "it_decay_fits_all_it_10ns_window"
+trace_config_dir: "it_decay_fits_all_it_10ns_window"
+time_window: "all"
+fit_all_discovered_traces: true
+fit_window_ns: 10.0
+skip_low_signal: false
+multiple_peak_strategy: "first"
+scatter_excluded_time_windows: "2ns"
+scatter_guide: "linear"
+scatter_guide_alpha: 0.32
+smooth_sigma: 2.0
+min_points: 30
+min_fit_points: 25
+peak_height_fraction: 0.20
+peak_prominence_fraction: 0.12
+noise_sigma_threshold: 3.0
+low_signal_sigma_threshold: 5.0
+fit_tau_min_ns: 0.03
+fit_tau_max_ns: 50.0

@@ -68,8 +68,10 @@ def classify(path_text: str) -> list[str]:
         labels.append("img_carpets")
     if name.endswith("_calc.txt"):
         labels.append("pl_calc_spectra")
-    if name.startswith("it_") and name.endswith("_10ns.dat"):
-        labels.append("it_10ns_traces")
+    if name.startswith("it_") and name.endswith(".dat"):
+        labels.append("it_traces")
+        if name.endswith("_10ns.dat"):
+            labels.append("it_10ns_traces")
     if name.startswith("t_") and name.endswith(".dat"):
         labels.append("t_dat_traces")
     if name.startswith("dc_"):

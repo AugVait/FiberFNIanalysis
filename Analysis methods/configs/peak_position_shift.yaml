@@ -1,0 +1,7 @@
+# Peak-position-shift analysis settings.
+# The PL spectrum membership and wavelength windows are read from pl_config_dir.
+out_subdir: "peak_position_shift"
+pl_config_dir: "pl_spectra"
+smooth_sigma_nm: 1.0
+fit_half_width_nm: 6.0
+exclude_points: "bcf6_ir:140"

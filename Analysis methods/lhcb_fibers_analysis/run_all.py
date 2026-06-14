@@ -110,6 +110,10 @@ def main(argv: list[str] | None = None) -> int:
 
     carpets_config = config_path(config_root, string_value(run_config, "carpets_config", "carpets.yaml"))
     it_decay_config = config_path(config_root, string_value(run_config, "it_decay_config", "it_decay_fits_10ns.yaml"))
+    peak_position_shift_config = config_path(
+        config_root,
+        string_value(run_config, "peak_position_shift_config", "peak_position_shift.yaml"),
+    )
     pl_config_dir = config_path(config_root, string_value(run_config, "pl_config_dir", "pl_spectra"))
     fiber_names_config = config_path(config_root, string_value(run_config, "fiber_names_config", "fiber_names.yaml"))
     carpet_time_windows = args.carpet_time_windows
@@ -129,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print("raw data check: OK")
 
-    from . import fit_it_decay, plot_pl_spectra, visualize_carpets
+    from . import fit_it_decay, peak_position_shift, plot_pl_spectra, visualize_carpets
 
     common = base_analysis_args(raw_dir, results_dir)
 
@@ -165,6 +169,17 @@ def main(argv: list[str] | None = None) -> int:
             pl_x_min_nm,
             pl_x_max_nm,
         )
+
+    if bool_value(run_config, "run_peak_position_shift", True):
+        print()
+        print("Generating PL peak-position shift figure...")
+        peak_args = common + [
+            "--config",
+            str(peak_position_shift_config),
+            "--fiber-names-config",
+            str(fiber_names_config),
+        ]
+        peak_position_shift.main(peak_args)
 
     if bool_value(run_config, "run_it_decay", True):
         print()

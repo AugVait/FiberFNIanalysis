@@ -1,0 +1,141 @@
+# Edit include values, then rerun python -m lhcb_fibers_analysis.fit_it_decay.
+# include: true fits the trace and writes its diagnostic PNG/PDF.
+group: "bcf10_noir"
+title: "bcf10_noir"
+traces:
+  - include: true
+    path: "2026 04 20/bcf_10/IT_bcf10_noir_120cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf10_noir, 120cm, 10ns, 509.961 nm, 2026-04-20"
+    sample: "bcf10_noir"
+    position: "120cm"
+    distance_cm: 120
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 509.961
+    measurement_date: "2026-04-20"
+    points: 508
+    delay_min_ns: -1.67341042
+    delay_max_ns: 11.12460518
+    counts_max: 194.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/IT_bcf10_noir_160cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf10_noir, 160cm, 10ns, 509.961 nm, 2026-04-20"
+    sample: "bcf10_noir"
+    position: "160cm"
+    distance_cm: 160
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 509.961
+    measurement_date: "2026-04-20"
+    points: 508
+    delay_min_ns: -2.07221031
+    delay_max_ns: 10.72580528
+    counts_max: 217.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/IT_bcf10_noir_160cm_ex360nm_10nJ_2ns.dat"
+    label: "bcf10_noir, 160cm, 2ns, 509.961 nm, 2026-04-20"
+    sample: "bcf10_noir"
+    position: "160cm"
+    distance_cm: 160
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    wavelength_label_nm: 509.961
+    measurement_date: "2026-04-20"
+    points: 508
+    delay_min_ns: -1.08059871
+    delay_max_ns: 1.24916506
+    counts_max: 66.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/IT_bcf10_noir_190cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf10_noir, 190cm, 10ns, 509.961 nm, 2026-04-20"
+    sample: "bcf10_noir"
+    position: "190cm"
+    distance_cm: 190
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 509.961
+    measurement_date: "2026-04-20"
+    points: 508
+    delay_min_ns: -1.5238018
+    delay_max_ns: 11.27421379
+    counts_max: 300.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/IT_bcf10_noir_57cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf10_noir, 57cm, 10ns, 509.961 nm, 2026-04-20"
+    sample: "bcf10_noir"
+    position: "57cm"
+    distance_cm: 57
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 509.961
+    measurement_date: "2026-04-20"
+    points: 508
+    delay_min_ns: -1.72327232
+    delay_max_ns: 11.07474327
+    counts_max: 228.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/IT_bcf10_noir_57cm_ex360nm_10nJ_2ns.dat"
+    label: "bcf10_noir, 57cm, 2ns, 509.961 nm, 2026-04-20"
+    sample: "bcf10_noir"
+    position: "57cm"
+    distance_cm: 57
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    wavelength_label_nm: 509.961
+    measurement_date: "2026-04-20"
+    points: 508
+    delay_min_ns: -0.4594214
+    delay_max_ns: 1.87034237
+    counts_max: 85.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/IT_bcf10_noir_57cm_ex360nm_10nJ_50ns.dat"
+    label: "bcf10_noir, 57cm, 50ns, 509.961 nm, 2026-04-20"
+    sample: "bcf10_noir"
+    position: "57cm"
+    distance_cm: 57
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    wavelength_label_nm: 509.961
+    measurement_date: "2026-04-20"
+    points: 508
+    delay_min_ns: -6.58046532
+    delay_max_ns: 45.05963135
+    counts_max: 275.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 20/bcf_10/IT_bcf10_noir_77cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf10_noir, 77cm, 10ns, 509.961 nm, 2026-04-20"
+    sample: "bcf10_noir"
+    position: "77cm"
+    distance_cm: 77
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 509.961
+    measurement_date: "2026-04-20"
+    points: 508
+    delay_min_ns: -1.59860992
+    delay_max_ns: 11.19940567
+    counts_max: 233.0
+    note: "default_on"

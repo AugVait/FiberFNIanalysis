@@ -1,0 +1,158 @@
+# Edit include values, then rerun python -m lhcb_fibers_analysis.fit_it_decay.
+# include: true fits the trace and writes its diagnostic PNG/PDF.
+group: "bcf6_ir"
+title: "bcf6_ir"
+traces:
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_100cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf6_ir, 100cm, 10ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "100cm"
+    distance_cm: 100
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -2.19679642
+    delay_max_ns: 10.60121918
+    counts_max: 178.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_100cm_ex360nm_10nJ_2ns.dat"
+    label: "bcf6_ir, 100cm, 2ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "100cm"
+    distance_cm: 100
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -0.75528944
+    delay_max_ns: 1.57447433
+    counts_max: 80.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_100cm_ex360nm_10nJ_50ns.dat"
+    label: "bcf6_ir, 100cm, 50ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "100cm"
+    distance_cm: 100
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -9.06475639
+    delay_max_ns: 42.57534027
+    counts_max: 156.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_150cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf6_ir, 150cm, 10ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "150cm"
+    distance_cm: 150
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -1.94760704
+    delay_max_ns: 10.85040855
+    counts_max: 120.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_150cm_ex360nm_10nJ_2ns.dat"
+    label: "bcf6_ir, 150cm, 2ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "150cm"
+    distance_cm: 150
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -1.06706035
+    delay_max_ns: 1.26270342
+    counts_max: 56.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_150cm_ex360nm_10nJ_50ns.dat"
+    label: "bcf6_ir, 150cm, 50ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "150cm"
+    distance_cm: 150
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -7.20261574
+    delay_max_ns: 44.43748093
+    counts_max: 158.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_37cm_ex360nm_10nJ_10ns.dat"
+    label: "bcf6_ir, 37cm, 10ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "37cm"
+    distance_cm: 37
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "10ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -1.27436829
+    delay_max_ns: 11.52364731
+    counts_max: 310.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_37cm_ex360nm_10nJ_2ns.dat"
+    label: "bcf6_ir, 37cm, 2ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "37cm"
+    distance_cm: 37
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "2ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -0.50973082
+    delay_max_ns: 1.82003295
+    counts_max: 113.0
+    note: "default_on"
+  - include: true
+    path: "2026 04 17/bcf_6/IT_bcf6_ir_37cm_ex360nm_10nJ_50ns.dat"
+    label: "bcf6_ir, 37cm, 50ns, 439.961 nm, 2026-04-17"
+    sample: "bcf6_ir"
+    position: "37cm"
+    distance_cm: 37
+    position_suffix: ""
+    excitation_nm: 360
+    pulse_energy_nj: 10
+    time_window: "50ns"
+    wavelength_label_nm: 439.961
+    measurement_date: "2026-04-17"
+    points: 508
+    delay_min_ns: -5.54188347
+    delay_max_ns: 46.0982132
+    counts_max: 201.0
+    note: "default_on"

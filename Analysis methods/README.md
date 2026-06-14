@@ -66,7 +66,7 @@ The same controls are easier to edit in `manual_scripts/manual_run_all.py`:
 
 ```python
 CARPET_TIME_WINDOWS = ("10ns",)
-IT_TIME_WINDOW = "10ns"
+IT_TIME_WINDOW = None
 PL_X_MIN_NM = 400.0
 PL_X_MAX_NM = 720.0
 ```
@@ -75,10 +75,12 @@ The run is controlled by YAML files under `configs`:
 
 - `configs/run_all.yaml`: selects which analysis families run.
 - `configs/fiber_names.yaml`: maps experimental result names to real fiber names used in generated plot labels and tables.
+- `configs/peak_position_shift.yaml`: controls the selected PL peak-position-shift plot and explicit point exclusions.
 - `configs/carpets.yaml`: Hamamatsu carpet visualization settings and pointer to detailed scan configs.
 - `configs/carpets/*.yaml`: sample-wise streak-camera scan membership and metadata.
-- `configs/it_decay_fits_10ns.yaml`: IT decay fitting settings and pointer to detailed trace configs.
-- `configs/it_decay_fits_10ns/*.yaml`: sample-wise integrated-time trace membership and metadata.
+- `configs/it_decay_fits_all_it_10ns_window.yaml`: IT decay fitting settings for all integrated-time traces, with fits capped to 10 ns after the detected peak.
+- `configs/it_decay_fits_all_it_10ns_window/*.yaml`: sample-wise integrated-time trace metadata.
+- `configs/it_decay_fits_10ns.yaml`: legacy 10 ns filename-only IT decay fitting settings.
 - `configs/pl_spectra/*.yaml`: PL spectrum plotting selections.
 
 Outputs are written under `../Analysis results`:
@@ -86,7 +88,9 @@ Outputs are written under `../Analysis results`:
 - `carpets`: Hamamatsu `.img` quicklooks, contact sheets, inventory, and HTML index.
 - `pl_spectra`: normalized PL plots and inventory.
 - `pl_spectra_raw`: raw-intensity PL plots and inventory.
-- `it_decay_fits_10ns`: `IT_*_10ns.dat` decay fits, matrices, plot PDFs/PNGs, and method note.
+- `peak_position_shift`: selected PL peak-position shifts, table, and all-sample plot.
+- `it_decay_fits_all_it_10ns_window`: all `IT_*.dat` decay fits using a 10 ns fit window, matrices, plot PDFs/PNGs, and method note.
+- `carpet_wavelength_cuts_20nm_txt`: text-only 20 nm wavelength cuts for every Hamamatsu carpet, with one folder per scan.
 
 ## Analysis Notes
 
@@ -94,12 +98,15 @@ Outputs are written under `../Analysis results`:
 - Numeric `cm` tokens are fiber positions in centimeters relative to the non-metalized end.
 - `ENDcm` is an endpoint condition, not a numeric distance.
 - `cm1` and `cm2` suffixes are replicate labels at the same distance.
+- Peak-position shift is calculated from spectra selected in `configs/pl_spectra/*.yaml`, relative to each fiber's first selected numeric position; explicit outlier exclusions are controlled in `configs/peak_position_shift.yaml`.
 - Real fiber names are display metadata only; raw-data paths and YAML selection keys continue to use experimental names.
 - Preserve the distinction between raw `.TXT` spectra, converted `_calc.txt` spectra, `.img` carpets, and derived `.dat` or `DC_` files.
 
 ## Manual Carpet Wavelength Cuts
 
 For one-off streak-carpet inspection, edit and run `manual_scripts/manual_carpet_wavelength_cuts.py`. It loads one `.img`, averages wavelength bands at regular centers, detects secondary peaks, fits a single exponential decay to the dominant peak while excluding later secondary peaks, and writes CSV/PNG diagnostics.
+
+For every carpet scan at once, edit and run `manual_scripts/manual_batch_carpet_wavelength_cuts.py`. It writes tab-delimited `.txt` files under `../Analysis results/carpet_wavelength_cuts_20nm_txt`, using clean 20 nm wavelength intervals such as `400-420` nm.
 
 The underlying command-line helper is:
 

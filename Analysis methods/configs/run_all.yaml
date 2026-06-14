@@ -1,6 +1,7 @@
 # Reproduction orchestration settings.
 carpets_config: "carpets.yaml"
-it_decay_config: "it_decay_fits_10ns.yaml"
+it_decay_config: "it_decay_fits_all_it_10ns_window.yaml"
+peak_position_shift_config: "peak_position_shift.yaml"
 pl_config_dir: "pl_spectra"
 fiber_names_config: "fiber_names.yaml"
 carpet_time_windows: ""
@@ -10,4 +11,5 @@ pl_x_max_nm: ""
 run_carpets: true
 run_pl_normalized: true
 run_pl_raw: true
+run_peak_position_shift: true
 run_it_decay: true

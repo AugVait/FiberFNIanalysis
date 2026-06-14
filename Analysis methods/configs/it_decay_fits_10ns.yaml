@@ -2,6 +2,7 @@
 out_subdir: "it_decay_fits_10ns"
 trace_config_dir: "it_decay_fits_10ns"
 time_window: "10ns"
+fit_all_discovered_traces: true
 smooth_sigma: 2.0
 min_points: 30
 min_fit_points: 25

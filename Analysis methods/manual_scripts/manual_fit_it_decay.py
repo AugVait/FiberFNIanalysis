@@ -17,16 +17,16 @@ from manual_common import (
 # Edit values in this block, then run this file directly.
 # Use None to keep the normal project defaults.
 
-CONFIG = CONFIGS_DIR / "it_decay_fits_10ns.yaml"
+CONFIG = CONFIGS_DIR / "it_decay_fits_all_it_10ns_window.yaml"
 TRACE_CONFIG_DIR = None
 OUT_SUBDIR = None
-TIME_WINDOW = None  # Firing/acquisition window, e.g. "10ns".
+TIME_WINDOW = None  # Firing/acquisition window filter, e.g. "10ns" or "all".
 
 REFRESH_CONFIGS = False
 
 # Examples:
-# TIME_WINDOW = "10ns"
-# OUT_SUBDIR = "it_decay_fits_10ns_manual"
+# TIME_WINDOW = "all"
+# OUT_SUBDIR = "it_decay_fits_all_it_10ns_window_manual"
 # REFRESH_CONFIGS = True
 
 

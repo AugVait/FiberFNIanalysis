@@ -41,10 +41,20 @@ from .scan_config import (
     relative_config_dir,
     yaml_scalar,
 )
-from .yaml_config import float_value, int_value, read_yaml_mapping, string_value
+from .yaml_config import bool_value, float_value, int_value, read_yaml_mapping, string_value
 
 
 DEFAULT_TIME_WINDOW = "10ns"
+LINE_COLORS = [
+    COLORS["blue"],
+    COLORS["vermillion"],
+    COLORS["teal"],
+    COLORS["purple"],
+    "#CC79A7",
+    "#E69F00",
+]
+MARKERS = ["o", "s", "^", "D", "v", "P"]
+MARKER_SIZE = 4.2
 
 
 @dataclass(frozen=True)
@@ -52,6 +62,13 @@ class FitConfig:
     out_subdir: str = "it_decay_fits_10ns"
     trace_config_dir: str = "it_decay_fits_10ns"
     time_window: str = DEFAULT_TIME_WINDOW
+    fit_all_discovered_traces: bool = True
+    fit_window_ns: float = 0.0
+    skip_low_signal: bool = True
+    multiple_peak_strategy: str = "skip"
+    scatter_excluded_time_windows: tuple[str, ...] = ()
+    scatter_guide: str = "linear"
+    scatter_guide_alpha: float = 0.32
     smooth_sigma: float = 2.0
     min_points: int = 30
     min_fit_points: int = 25
@@ -63,6 +80,11 @@ class FitConfig:
     fit_tau_max_ns: float = 50.0
 
 
+def csv_values(value: object) -> tuple[str, ...]:
+    """Parse a comma-separated scalar config value."""
+    return tuple(part.strip() for part in str(value or "").split(",") if part.strip())
+
+
 def read_fit_config(path: Path) -> FitConfig:
     """Read integrated-time decay fitting settings from YAML."""
     values = read_yaml_mapping(path)
@@ -70,10 +92,25 @@ def read_fit_config(path: Path) -> FitConfig:
     tau_max = float_value(values, "fit_tau_max_ns", 50.0)
     if tau_max <= tau_min:
         raise ValueError(f"fit_tau_max_ns must be greater than fit_tau_min_ns in {path}")
+    multiple_peak_strategy = string_value(values, "multiple_peak_strategy", "skip").strip().lower()
+    if multiple_peak_strategy not in {"skip", "first", "dominant"}:
+        raise ValueError(
+            f"multiple_peak_strategy must be one of skip, first, or dominant in {path}"
+        )
+    scatter_guide = string_value(values, "scatter_guide", "linear").strip().lower()
+    if scatter_guide not in {"none", "linear", "point_to_point"}:
+        raise ValueError(f"scatter_guide must be one of none, linear, or point_to_point in {path}")
     return FitConfig(
         out_subdir=string_value(values, "out_subdir", "it_decay_fits_10ns"),
         trace_config_dir=string_value(values, "trace_config_dir", "it_decay_fits_10ns"),
         time_window=string_value(values, "time_window", DEFAULT_TIME_WINDOW),
+        fit_all_discovered_traces=bool_value(values, "fit_all_discovered_traces", True),
+        fit_window_ns=max(0.0, float_value(values, "fit_window_ns", 0.0)),
+        skip_low_signal=bool_value(values, "skip_low_signal", True),
+        multiple_peak_strategy=multiple_peak_strategy,
+        scatter_excluded_time_windows=csv_values(values.get("scatter_excluded_time_windows", "")),
+        scatter_guide=scatter_guide,
+        scatter_guide_alpha=max(0.0, min(1.0, float_value(values, "scatter_guide_alpha", 0.32))),
         smooth_sigma=float_value(values, "smooth_sigma", 2.0),
         min_points=max(1, int_value(values, "min_points", 30)),
         min_fit_points=max(1, int_value(values, "min_fit_points", 25)),
@@ -166,15 +203,36 @@ def natural_position_key(position: str) -> tuple[float, str]:
     return (float(match.group("distance")), match.group("suffix"))
 
 
+def all_time_windows(time_window: str) -> bool:
+    """Return true when IT trace discovery should include every acquisition window."""
+    return time_window.strip().lower() in {"", "*", "all", "any"}
+
+
+def it_discovery_pattern(time_window: str) -> str:
+    """Return the filename pattern used for integrated-time trace discovery."""
+    return "IT_*.dat" if all_time_windows(time_window) else f"IT_*_{time_window}.dat"
+
+
+def time_window_sort_key(window: str) -> tuple[int, float, str]:
+    """Sort acquisition-window labels by duration when possible."""
+    match = re.fullmatch(r"(?P<value>\d+(?:\.\d+)?)(?P<unit>ns|us|ms)", window, flags=re.IGNORECASE)
+    if not match:
+        return (1, math.inf, window)
+    unit_scale = {"ns": 1.0, "us": 1000.0, "ms": 1_000_000.0}
+    duration_ns = float(match.group("value")) * unit_scale[match.group("unit").lower()]
+    return (0, duration_ns, window)
+
+
 def discover_traces(raw_dir: Path, time_window: str) -> list[TraceInfo]:
-    """Find integrated-time traces matching the requested time window."""
+    """Find integrated-time traces matching the requested acquisition-window filter."""
     traces: list[TraceInfo] = []
-    for path in sorted(raw_dir.rglob(f"IT_*_{time_window}.dat")):
+    include_all_windows = all_time_windows(time_window)
+    for path in sorted(raw_dir.rglob(it_discovery_pattern(time_window))):
         match = FILENAME_RE.match(path.name)
         if not match:
             continue
         parts = match.groupdict()
-        if parts["window"].lower() != time_window.lower():
+        if not include_all_windows and parts["window"].lower() != time_window.lower():
             continue
         first_two = path.read_text(encoding="utf-8", errors="replace").splitlines()[:2]
         wavelength_label = ""
@@ -359,18 +417,21 @@ def fit_trace(
     signal = smooth - baseline_seed
     peak_idx = int(np.argmax(signal))
     peak_height = float(signal[peak_idx])
+    fit_warnings: list[str] = []
 
     result.update(
         n_points=n,
         baseline_seed_counts=baseline_seed,
         noise_counts=noise,
-        primary_peak_delay_ns=float(x[peak_idx]),
-        primary_peak_counts=float(y[peak_idx]),
+        dominant_peak_delay_ns=float(x[peak_idx]),
+        dominant_peak_counts=float(y[peak_idx]),
     )
 
     if peak_height <= max(config.low_signal_sigma_threshold * noise, config.low_signal_sigma_threshold):
-        result.update(status="skipped", skip_reason="low_signal")
-        return result
+        if config.skip_low_signal:
+            result.update(status="skipped", skip_reason="low_signal")
+            return result
+        fit_warnings.append("low_signal_fit_forced")
 
     min_distance = max(8, int(round(0.25 / abs(dt)))) if dt else 8
     peaks, props = find_peaks(
@@ -395,31 +456,46 @@ def fit_trace(
     )
 
     if len(significant_peaks) > 1:
-        result.update(status="skipped", skip_reason="multiple_significant_peaks")
-        return result
+        if config.multiple_peak_strategy == "skip":
+            result.update(status="skipped", skip_reason="multiple_significant_peaks")
+            return result
+        if config.multiple_peak_strategy == "first":
+            peak_idx = int(significant_peaks[0])
+            fit_warnings.append("multiple_peaks_fit_first")
+        else:
+            fit_warnings.append("multiple_peaks_fit_dominant")
 
-    post_peak = np.arange(peak_idx, n)
-    below_85 = np.where(smooth[post_peak] <= baseline_seed + 0.85 * peak_height)[0]
-    if below_85.size:
-        fit_start_idx = int(post_peak[below_85[0]])
-    else:
-        fit_start_idx = min(n - 1, peak_idx + max(3, int(round(0.10 / abs(dt)))))
-    fit_start_idx = max(fit_start_idx, peak_idx + 3)
+    result.update(
+        primary_peak_delay_ns=float(x[peak_idx]),
+        primary_peak_counts=float(y[peak_idx]),
+    )
 
-    threshold = baseline_seed + max(0.05 * peak_height, config.noise_sigma_threshold * noise, 1.0)
+    fit_start_idx = peak_idx
+    fit_peak_height = max(float(smooth[fit_start_idx] - baseline_seed), 0.0)
+    fit_limit_idx = n
+    if config.fit_window_ns > 0:
+        fit_window_end_ns = float(x[fit_start_idx] + config.fit_window_ns)
+        fit_limit_idx = int(np.searchsorted(x, fit_window_end_ns, side="right"))
+        fit_limit_idx = min(n, max(fit_start_idx + 1, fit_limit_idx))
+
+    threshold = baseline_seed + max(0.05 * fit_peak_height, config.noise_sigma_threshold * noise, 1.0)
     below_noise = smooth[fit_start_idx:] <= threshold
     sustained_idx = first_sustained_true(below_noise, run_length=10)
     if sustained_idx is None:
-        fit_end_idx = n
+        fit_end_idx = fit_limit_idx
     else:
-        fit_end_idx = fit_start_idx + sustained_idx
+        fit_end_idx = min(fit_limit_idx, fit_start_idx + sustained_idx)
 
     min_fit_points = config.min_fit_points
     if fit_end_idx - fit_start_idx < min_fit_points:
-        fit_end_idx = min(n, fit_start_idx + min_fit_points)
+        fit_end_idx = min(fit_limit_idx, fit_start_idx + min_fit_points)
 
     if fit_end_idx - fit_start_idx < min_fit_points:
-        result.update(status="skipped", skip_reason="too_few_decay_points")
+        result.update(
+            status="skipped",
+            skip_reason="too_few_decay_points",
+            fit_window_limit_ns=float(config.fit_window_ns) if config.fit_window_ns > 0 else "",
+        )
         return result
 
     x_fit = x[fit_start_idx:fit_end_idx]
@@ -464,7 +540,7 @@ def fit_trace(
     rmse = float(np.sqrt(np.mean(residual**2)))
     perr = np.sqrt(np.diag(pcov)) if pcov.size else np.full(3, np.nan)
 
-    warnings: list[str] = []
+    warnings: list[str] = list(fit_warnings)
     if popt[1] <= config.fit_tau_min_ns * 1.034 or popt[1] >= config.fit_tau_max_ns * 0.98:
         warnings.append("tau_near_bound")
     if r_squared < 0.90:
@@ -483,8 +559,10 @@ def fit_trace(
         baseline_se_counts=float(perr[2]) if len(perr) > 2 else float("nan"),
         r_squared=r_squared,
         rmse_counts=rmse,
+        fit_window_limit_ns=float(config.fit_window_ns) if config.fit_window_ns > 0 else "",
         fit_start_ns=float(x_fit[0]),
         fit_end_ns=float(x_fit[-1]),
+        fit_duration_ns=float(x_fit[-1] - x_fit[0]),
         fit_points=len(x_fit),
         fit_warning=";".join(warnings),
     )
@@ -529,8 +607,20 @@ def plot_trace(
         lw=0.9,
         ls=":",
         color=COLORS["blue"],
-        label="dominant peak",
+        label="fit-start peak",
     )
+    dominant_peak_delay = result.get("dominant_peak_delay_ns")
+    if dominant_peak_delay not in {None, ""}:
+        dominant_peak_x = float(dominant_peak_delay)
+        fit_peak_x = float(result.get("primary_peak_delay_ns", dominant_peak_x))
+        if abs(dominant_peak_x - fit_peak_x) > 0.5 * max(abs(float(np.median(np.diff(x)))), 1.0e-12):
+            ax.axvline(
+                dominant_peak_x,
+                lw=0.85,
+                ls="--",
+                color=COLORS["gray"],
+                label="dominant peak",
+            )
 
     peak_delays = str(result.get("detected_peak_delays_ns", "")).split(";")
     peak_label_used = False
@@ -635,15 +725,29 @@ def write_csv(path: Path, rows: list[dict[str, object]], fieldnames: list[str]) 
 def build_matrices(results: list[dict[str, object]]) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Build decay-time and status matrices from fit results."""
     samples = sorted({str(row.get("fiber_name", row["sample"])) for row in results})
-    positions = sorted({str(row["position"]) for row in results}, key=natural_position_key)
-    tau_matrix = pd.DataFrame(index=samples, columns=positions, dtype=object)
-    status_matrix = pd.DataFrame(index=samples, columns=positions, dtype=object)
+    include_window_in_column = len({str(row.get("time_window", "")) for row in results}) > 1
+
+    def column_label(row: dict[str, object]) -> str:
+        position = str(row["position"])
+        if not include_window_in_column:
+            return position
+        return f"{position} {row.get('time_window', '')}".strip()
+
+    def column_sort_key(label: str) -> tuple[tuple[float, str], tuple[int, float, str], str]:
+        if not include_window_in_column:
+            return (natural_position_key(label), (0, 0.0, ""), label)
+        position, _, window = label.rpartition(" ")
+        return (natural_position_key(position), time_window_sort_key(window), label)
+
+    columns = sorted({column_label(row) for row in results}, key=column_sort_key)
+    tau_matrix = pd.DataFrame(index=samples, columns=columns, dtype=object)
+    status_matrix = pd.DataFrame(index=samples, columns=columns, dtype=object)
     tau_matrix.index.name = "fiber_name"
     status_matrix.index.name = "fiber_name"
 
     for row in results:
         sample = str(row.get("fiber_name", row["sample"]))
-        position = str(row["position"])
+        position = column_label(row)
         if row.get("status") == "fit":
             tau_matrix.loc[sample, position] = float(row["tau_ns"])
             se = float(row.get("tau_se_ns", float("nan")))
@@ -662,28 +766,224 @@ def build_matrices(results: list[dict[str, object]]) -> tuple[pd.DataFrame, pd.D
     return tau_matrix.fillna(""), status_matrix.fillna("")
 
 
-def write_method_note(path: Path, results: list[dict[str, object]], time_window: str) -> None:
+def finite_float(value: object) -> float | None:
+    """Convert a value to a finite float when possible."""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def is_unirradiated_result(row: dict[str, object]) -> bool:
+    """Return true for Non-IR/unirradiated samples."""
+    sample = str(row.get("sample", "")).lower()
+    fiber_name = str(row.get("fiber_name", "")).lower()
+    return sample.endswith("_noir") or "non-ir" in fiber_name
+
+
+def linear_guide_xy(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return a linear guide fit through per-position mean values."""
+    unique_x = np.array(sorted(set(float(value) for value in x)), dtype=float)
+    if unique_x.size == 0:
+        return x, y
+    mean_y = np.array([float(np.mean(y[np.isclose(x, value)])) for value in unique_x], dtype=float)
+    if unique_x.size < 2:
+        return unique_x, mean_y
+
+    x_dense = np.linspace(float(unique_x[0]), float(unique_x[-1]), 120)
+    slope, intercept = np.polyfit(unique_x, mean_y, deg=1)
+    y_dense = slope * x_dense + intercept
+    return x_dense, y_dense
+
+
+def plot_decay_time_scatter(
+    results: list[dict[str, object]],
+    out_png: Path,
+    out_pdf: Path,
+    excluded_time_windows: tuple[str, ...] = (),
+    guide: str = "linear",
+    guide_alpha: float = 0.32,
+) -> None:
+    """Plot fitted decay time versus position with error bars and guide lines."""
+    excluded_windows = {window.lower() for window in excluded_time_windows}
+    fit_rows = [
+        row
+        for row in results
+        if row.get("status") == "fit"
+        and finite_float(row.get("tau_ns")) is not None
+        and position_parts(str(row.get("position", "")))[0] is not None
+        and str(row.get("time_window", "")).lower() not in excluded_windows
+    ]
+    if not fit_rows:
+        return
+
+    samples = sorted(
+        {str(row.get("sample", "")) for row in fit_rows},
+        key=lambda sample: str(next(row.get("fiber_name", sample) for row in fit_rows if row.get("sample") == sample)),
+    )
+    sample_style = {
+        sample: (LINE_COLORS[index % len(LINE_COLORS)], MARKERS[index % len(MARKERS)])
+        for index, sample in enumerate(samples)
+    }
+
+    set_publication_style()
+    fig, ax = plt.subplots(figsize=DOUBLE_COLUMN_WIDE, constrained_layout=True)
+    sample_handles: dict[str, object] = {}
+
+    for sample in samples:
+        group_rows = [
+            row for row in fit_rows if str(row.get("sample", "")) == sample
+        ]
+        if not group_rows:
+            continue
+        group_rows = sorted(
+            group_rows,
+            key=lambda row: (
+                position_parts(str(row.get("position", "")))[0] or math.inf,
+                time_window_sort_key(str(row.get("time_window", ""))),
+                str(row.get("source_file", "")),
+            ),
+        )
+        x = np.array(
+            [float(position_parts(str(row["position"]))[0] or 0) for row in group_rows],
+            dtype=float,
+        )
+        y = np.array([float(row["tau_ns"]) for row in group_rows], dtype=float)
+        yerr = np.array(
+            [
+                finite_float(row.get("tau_se_ns")) if finite_float(row.get("tau_se_ns")) is not None else 0.0
+                for row in group_rows
+            ],
+            dtype=float,
+        )
+        color, marker = sample_style[sample]
+        fill = color if is_unirradiated_result(group_rows[0]) else "white"
+        label = str(group_rows[0].get("fiber_name", sample))
+        if guide == "linear":
+            x_guide, y_guide = linear_guide_xy(x, y)
+            ax.plot(x_guide, y_guide, "-", color=color, linewidth=0.95, alpha=guide_alpha, zorder=1)
+        elif guide == "point_to_point":
+            ax.plot(x, y, "-", color=color, linewidth=0.85, alpha=guide_alpha, zorder=1)
+        container = ax.errorbar(
+            x,
+            y,
+            yerr=yerr,
+            fmt=marker,
+            ms=MARKER_SIZE,
+            linestyle="none",
+            color=color,
+            ecolor=color,
+            elinewidth=0.75,
+            capsize=2.0,
+            markerfacecolor=fill,
+            markeredgecolor=color,
+            markeredgewidth=0.85,
+            label=label,
+            zorder=2,
+        )
+        sample_handles.setdefault(label, container)
+
+    ax.set_xlabel("Position (cm)")
+    ax.set_ylabel(r"Decay time $\tau$ (ns)")
+    apply_axes_style(ax, grid=True)
+
+    fig.legend(
+        list(sample_handles.values()),
+        list(sample_handles.keys()),
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.5),
+        ncols=1,
+        title="filled: Non-IR\nopen: IR",
+        borderaxespad=0.0,
+        columnspacing=1.0,
+        handlelength=1.6,
+    )
+
+    save_figure(fig, out_png)
+    save_figure(fig, out_pdf)
+    plt.close(fig)
+
+
+def write_method_note(
+    path: Path,
+    results: list[dict[str, object]],
+    time_window: str,
+    fit_all_discovered_traces: bool,
+    fit_window_ns: float,
+    skip_low_signal: bool,
+    multiple_peak_strategy: str,
+    scatter_excluded_time_windows: tuple[str, ...],
+    scatter_guide: str,
+    scatter_guide_alpha: float,
+) -> None:
     """Write the method summary README for IT decay fits."""
     fit_count = sum(1 for row in results if row.get("status") == "fit")
     skip_count = len(results) - fit_count
-    method = f"""# IT 10 ns Decay Fits
+    pattern = it_discovery_pattern(time_window)
+    title = "IT All-Window Decay Fits" if all_time_windows(time_window) else "IT 10 ns Decay Fits"
+    if fit_all_discovered_traces:
+        scope = f"Analysis scope: every discovered `{pattern}` measurement under the raw-data folder."
+    else:
+        scope = "Analysis scope: traces selected by `include: true` in the trace YAML files."
+    if all_time_windows(time_window):
+        inputs = "`IT_*.dat` integrated-time traces. Streak-map `.img` files, `T_*.dat` band traces, and derived files are excluded."
+        summary_window = "all acquisition-window"
+    else:
+        inputs = f"`IT_*_{time_window}.dat` only. Streak-map `.img` files, `T_*.dat` band traces, and other `IT_*.dat` time windows are excluded."
+        summary_window = time_window
+    if fit_window_ns > 0:
+        fit_window_rule = f"Fit window: each fit starts at the selected peak and uses at most {fit_window_ns:g} ns of data after that peak."
+    else:
+        fit_window_rule = "Fit window: each fit starts at the selected peak and ends at the automatic low-signal cutoff."
+    low_signal_rule = (
+        "Low-signal traces are skipped before fitting."
+        if skip_low_signal
+        else "Low-signal traces are still fit and marked with a warning."
+    )
+    if multiple_peak_strategy == "skip":
+        multiple_peak_rule = "Traces with more than one significant temporal peak are not fit."
+    elif multiple_peak_strategy == "first":
+        multiple_peak_rule = "When more than one significant temporal peak is detected, the fit starts at the first detected peak."
+    else:
+        multiple_peak_rule = "When more than one significant temporal peak is detected, the fit starts at the dominant peak."
+    scatter_note = ""
+    if scatter_excluded_time_windows:
+        excluded = ", ".join(spaced_units(window) for window in scatter_excluded_time_windows)
+        scatter_note = f" The scatter plot excludes {excluded} acquisition-window traces."
+    if scatter_guide == "linear":
+        scatter_note += f" Guide lines are per-sample linear fits drawn with alpha {scatter_guide_alpha:g}."
+    elif scatter_guide == "point_to_point":
+        scatter_note += f" Guide lines connect points in sample order with alpha {scatter_guide_alpha:g}."
+    elif scatter_guide == "none":
+        scatter_note += " Guide lines are disabled."
+    method = f"""# {title}
 
-Inputs: `IT_*_{time_window}.dat` only. Streak-map `.img` files, `T_*.dat` band traces, and other `IT_*.dat` time windows are excluded.
+Inputs: {inputs}
 
-Fit rule: each trace is smoothed only for peak detection, then a single exponential plus constant baseline is fit to the raw-count falling edge after one dominant peak:
+{scope}
+
+{fit_window_rule}
+
+{low_signal_rule}
+
+{multiple_peak_rule}
+
+Fit rule: each trace is smoothed only for peak detection, then a single exponential plus constant baseline is fit to the selected raw-count decay interval:
 
 `I(t) = A exp(-(t - t_start) / tau) + B`
 
-Traces with more than one significant temporal peak are not fit. The peak detector requires a secondary peak to exceed both a relative threshold and a noise/prominence threshold, so isolated count noise is not treated as a separate decay component.
+The peak detector requires a secondary peak to exceed both a relative threshold and a noise/prominence threshold, so isolated count noise is not treated as a separate decay component.
 
 Outputs:
 
 - `fit_inventory.csv`: one row per input trace, including fit status, tau, standard error, R^2, fit window, peak count, and plot paths.
 - `decay_times_matrix.csv`: samples as rows, positions as columns, fitted decay times in ns.
 - `decay_times_matrix_with_status.csv`: same layout with uncertainty or skip reason in each cell.
+- `decay_times_scatter.png` and `.pdf`: fitted decay times versus position with standard-error bars and guide lines.{scatter_note}
 - `plots/<sample>/`: PNG and PDF fit-quality plots for every input trace.
 
-Summary: {fit_count} fitted, {skip_count} skipped, {len(results)} total {time_window} IT traces.
+Summary: {fit_count} fitted, {skip_count} skipped, {len(results)} total {summary_window} IT traces.
 """
     path.write_text(method, encoding="utf-8")
 
@@ -720,19 +1020,33 @@ def main(argv: list[str] | None = None) -> None:
 
     discovered_traces = discover_traces(raw_dir, time_window)
     if not discovered_traces:
-        raise SystemExit(f"No IT_*_{time_window}.dat files found under {raw_dir}")
+        raise SystemExit(f"No {it_discovery_pattern(time_window)} files found under {raw_dir}")
 
     if args.refresh_configs or not configs_exist(trace_config_dir):
         write_trace_configs(discovered_traces, trace_config_dir)
 
-    trace_configs = read_section_configs(trace_config_dir, "traces")
-    if not trace_configs:
+    traces_by_path = {trace.relative_path.as_posix(): trace for trace in discovered_traces}
+    configured_trace_paths: set[Path] = set()
+    if configs_exist(trace_config_dir):
+        trace_configs = read_section_configs(trace_config_dir, "traces")
+        _, _, configured_trace_paths = selected_traces_from_configs(trace_configs, traces_by_path)
+    elif not config.fit_all_discovered_traces:
         raise SystemExit(f"No IT trace YAML configs found in {trace_config_dir}")
 
-    traces_by_path = {trace.relative_path.as_posix(): trace for trace in discovered_traces}
-    traces, selected_trace_paths, configured_trace_paths = selected_traces_from_configs(trace_configs, traces_by_path)
-    if not traces:
-        raise SystemExit(f"No IT traces are selected in {trace_config_dir}")
+    if config.fit_all_discovered_traces:
+        traces = sorted(
+            discovered_traces,
+            key=lambda trace: (trace.sample, natural_position_key(trace.position), trace.relative_path.as_posix()),
+        )
+        selected_trace_paths = {trace.relative_path for trace in traces}
+    else:
+        trace_configs = read_section_configs(trace_config_dir, "traces")
+        traces, selected_trace_paths, configured_trace_paths = selected_traces_from_configs(
+            trace_configs,
+            traces_by_path,
+        )
+        if not traces:
+            raise SystemExit(f"No IT traces are selected in {trace_config_dir}")
 
     results: list[dict[str, object]] = []
     for info in traces:
@@ -761,12 +1075,16 @@ def main(argv: list[str] | None = None) -> None:
         "baseline_se_counts",
         "r_squared",
         "rmse_counts",
+        "fit_window_limit_ns",
         "fit_start_ns",
         "fit_end_ns",
+        "fit_duration_ns",
         "fit_points",
         "fit_warning",
         "detected_peak_count",
         "detected_peak_delays_ns",
+        "dominant_peak_delay_ns",
+        "dominant_peak_counts",
         "primary_peak_delay_ns",
         "primary_peak_counts",
         "baseline_seed_counts",
@@ -784,11 +1102,33 @@ def main(argv: list[str] | None = None) -> None:
     tau_matrix, status_matrix = build_matrices(results)
     tau_matrix.to_csv(out_root / "decay_times_matrix.csv", float_format="%.6g")
     status_matrix.to_csv(out_root / "decay_times_matrix_with_status.csv")
-    write_method_note(out_root / "README.md", results, time_window)
+    plot_decay_time_scatter(
+        results,
+        out_root / "decay_times_scatter.png",
+        out_root / "decay_times_scatter.pdf",
+        config.scatter_excluded_time_windows,
+        config.scatter_guide,
+        config.scatter_guide_alpha,
+    )
+    write_method_note(
+        out_root / "README.md",
+        results,
+        time_window,
+        config.fit_all_discovered_traces,
+        config.fit_window_ns,
+        config.skip_low_signal,
+        config.multiple_peak_strategy,
+        config.scatter_excluded_time_windows,
+        config.scatter_guide,
+        config.scatter_guide_alpha,
+    )
 
     fit_count = sum(1 for row in results if row.get("status") == "fit")
-    print(f"Configured {len(configured_trace_paths)} IT {time_window} traces; selected {len(selected_trace_paths)}.")
-    print(f"Processed {len(results)} IT {time_window} traces: {fit_count} fit, {len(results) - fit_count} skipped.")
+    discovery_label = "all acquisition-window" if all_time_windows(time_window) else time_window
+    print(f"Discovered {len(discovered_traces)} {discovery_label} IT traces; fitting {len(selected_trace_paths)}.")
+    if not config.fit_all_discovered_traces:
+        print(f"Configured {len(configured_trace_paths)} {discovery_label} IT traces; selected {len(selected_trace_paths)}.")
+    print(f"Processed {len(results)} {discovery_label} IT traces: {fit_count} fit, {len(results) - fit_count} skipped.")
     print(f"Output: {out_root}")
     print(f"config: {config_path}")
     print(f"fiber names: {fiber_names_config}")

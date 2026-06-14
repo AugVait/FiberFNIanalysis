@@ -31,6 +31,7 @@ The raw-data check must pass before reproducing results. For the current manifes
 
 - `img_carpets`: 104
 - `pl_calc_spectra`: 204
+- `it_traces`: 36
 - `it_10ns_traces`: 18
 
 ## 4. Rebuild All Results
@@ -57,7 +58,8 @@ Expected generated result folders:
 - `..\Analysis results\carpets`
 - `..\Analysis results\pl_spectra`
 - `..\Analysis results\pl_spectra_raw`
-- `..\Analysis results\it_decay_fits_10ns`
+- `..\Analysis results\peak_position_shift`
+- `..\Analysis results\it_decay_fits_all_it_10ns_window`
 
 ## Individual Manual Scripts
 
@@ -66,6 +68,7 @@ Use these when you only want one analysis family:
 ```powershell
 .\.venv\Scripts\python.exe .\manual_scripts\manual_visualize_carpets.py
 .\.venv\Scripts\python.exe .\manual_scripts\manual_pl_spectra.py
+.\.venv\Scripts\python.exe .\manual_scripts\manual_peak_position_shift.py
 .\.venv\Scripts\python.exe .\manual_scripts\manual_fit_it_decay.py
 .\.venv\Scripts\python.exe .\manual_scripts\manual_carpet_wavelength_cuts.py
 ```
@@ -76,7 +79,8 @@ Use these when you only want one analysis family:
 .\.venv\Scripts\python.exe -m lhcb_fibers_analysis.visualize_carpets --raw-dir "..\raw data" --results-dir "..\Analysis results"
 .\.venv\Scripts\python.exe -m lhcb_fibers_analysis.plot_pl_spectra --raw-dir "..\raw data" --results-dir "..\Analysis results" --intensity-mode normalized
 .\.venv\Scripts\python.exe -m lhcb_fibers_analysis.plot_pl_spectra --raw-dir "..\raw data" --results-dir "..\Analysis results" --intensity-mode raw
-.\.venv\Scripts\python.exe -m lhcb_fibers_analysis.fit_it_decay --raw-dir "..\raw data" --results-dir "..\Analysis results" --time-window 10ns
+.\.venv\Scripts\python.exe -m lhcb_fibers_analysis.peak_position_shift --raw-dir "..\raw data" --results-dir "..\Analysis results" --config configs\peak_position_shift.yaml
+.\.venv\Scripts\python.exe -m lhcb_fibers_analysis.fit_it_decay --raw-dir "..\raw data" --results-dir "..\Analysis results"
 ```
 
 Each individual command also accepts a config flag:
@@ -87,7 +91,11 @@ Each individual command also accepts a config flag:
 - `plot_pl_spectra --config-dir configs\pl_spectra`
 - `plot_pl_spectra --fiber-names-config configs\fiber_names.yaml`
 - `plot_pl_spectra --x-min-nm 400 --x-max-nm 720`
-- `fit_it_decay --config configs\it_decay_fits_10ns.yaml`
+- `peak_position_shift --config configs\peak_position_shift.yaml`
+- `peak_position_shift --config-dir configs\pl_spectra`
+- `peak_position_shift --fiber-names-config configs\fiber_names.yaml`
+- `fit_it_decay --config configs\it_decay_fits_all_it_10ns_window.yaml`
+- `fit_it_decay --config configs\it_decay_fits_10ns.yaml` for the legacy 10 ns filename-only analysis
 - `fit_it_decay --fiber-names-config configs\fiber_names.yaml`
 
 Use `--refresh-configs` only when intentionally rebuilding curated YAML selection files from discovered raw data. It is supported by `visualize_carpets`, `plot_pl_spectra`, and `fit_it_decay`.
