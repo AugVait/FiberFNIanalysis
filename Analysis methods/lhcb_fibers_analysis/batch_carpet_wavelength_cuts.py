@@ -8,9 +8,23 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
+import matplotlib
 
-from .carpet_wavelength_cuts import CutProfile, FitResult, exp_decay, fit_cut_profile
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import Normalize
+from scipy.ndimage import gaussian_filter1d
+from scipy.optimize import curve_fit
+
+from .carpet_wavelength_cuts import (
+    CutProfile,
+    FitResult,
+    exp_decay,
+    first_sustained_true,
+    fit_cut_profile,
+    robust_noise,
+)
 from .hamamatsu_streak import (
     TOP_EDGE_CROP_ROWS,
     crop_top_edge,
@@ -22,6 +36,7 @@ from .hamamatsu_streak import (
     x_scale_nm_per_pixel,
 )
 from .paths import DEFAULT_RAW_DIR, DEFAULT_RESULTS_DIR, resolve_path
+from .plot_style import DOUBLE_COLUMN_WIDE, apply_axes_style, save_figure, set_publication_style
 
 
 DEFAULT_OUT_SUBDIR = "carpet_wavelength_cuts_20nm_txt"
@@ -41,10 +56,38 @@ class ScanOutput:
     relative_path: Path
     output_dir: Path
     band_count: int
-    fit_count: int
-    skipped_count: int
+    decay_fit_count: int
+    decay_skipped_count: int
+    rise_fit_count: int
+    rise_skipped_count: int
     status: str
     note: str
+
+
+@dataclass(frozen=True)
+class RiseFitResult:
+    center_nm: float
+    wavelength_min_nm: float
+    wavelength_max_nm: float
+    column_count: int
+    status: str
+    reason: str
+    rise_tau_ns: float
+    rise_tau_se_ns: float
+    rise_time_10_90_ns: float
+    observed_rise_time_10_90_ns: float
+    amplitude_counts: float
+    baseline_counts: float
+    midpoint_time_ns: float
+    r_squared: float
+    rmse_counts: float
+    peak_time_ns: float
+    peak_counts: float
+    threshold_10_time_ns: float
+    threshold_90_time_ns: float
+    fit_start_ns: float
+    fit_end_ns: float
+    fit_points: int
 
 
 def safe_scan_folder(relative_path: Path) -> str:
@@ -147,6 +190,208 @@ def make_band_profile(
     return BandProfile(requested_min_nm=start_nm, requested_max_nm=end_nm, cut=cut)
 
 
+def sigmoid_rise(time_ns: np.ndarray, amplitude: float, k_ns: float, baseline: float, midpoint_ns: float) -> np.ndarray:
+    """Evaluate a sigmoid rising edge."""
+    exponent = np.clip(-(time_ns - midpoint_ns) / k_ns, -700, 700)
+    return baseline + amplitude / (1.0 + np.exp(exponent))
+
+
+def crossing_time(time_ns: np.ndarray, signal: np.ndarray, threshold: float, end_idx: int) -> float:
+    """Return a linearly interpolated first rising threshold crossing before a peak."""
+    for idx in range(1, end_idx + 1):
+        previous = signal[idx - 1]
+        current = signal[idx]
+        if previous < threshold <= current:
+            span = current - previous
+            if span == 0:
+                return float(time_ns[idx])
+            fraction = (threshold - previous) / span
+            return float(time_ns[idx - 1] + fraction * (time_ns[idx] - time_ns[idx - 1]))
+    return float("nan")
+
+
+def skipped_rise_result(
+    cut: CutProfile,
+    reason: str,
+    peak_time_ns: float = float("nan"),
+    peak_counts: float = float("nan"),
+    threshold_10_time_ns: float = float("nan"),
+    threshold_90_time_ns: float = float("nan"),
+) -> RiseFitResult:
+    """Create a rise-fit result describing why a band was skipped."""
+    observed = (
+        threshold_90_time_ns - threshold_10_time_ns
+        if math.isfinite(threshold_10_time_ns) and math.isfinite(threshold_90_time_ns)
+        else float("nan")
+    )
+    return RiseFitResult(
+        center_nm=cut.center_nm,
+        wavelength_min_nm=cut.wavelength_min_nm,
+        wavelength_max_nm=cut.wavelength_max_nm,
+        column_count=cut.column_count,
+        status="skipped",
+        reason=reason,
+        rise_tau_ns=float("nan"),
+        rise_tau_se_ns=float("nan"),
+        rise_time_10_90_ns=float("nan"),
+        observed_rise_time_10_90_ns=observed,
+        amplitude_counts=float("nan"),
+        baseline_counts=float("nan"),
+        midpoint_time_ns=float("nan"),
+        r_squared=float("nan"),
+        rmse_counts=float("nan"),
+        peak_time_ns=peak_time_ns,
+        peak_counts=peak_counts,
+        threshold_10_time_ns=threshold_10_time_ns,
+        threshold_90_time_ns=threshold_90_time_ns,
+        fit_start_ns=float("nan"),
+        fit_end_ns=float("nan"),
+        fit_points=0,
+    )
+
+
+def fit_rise_profile(
+    cut: CutProfile,
+    time_ns: np.ndarray,
+    *,
+    smooth_sigma: float,
+    min_fit_points: int,
+    min_peak_sigma: float,
+    tau_min_ns: float,
+    tau_max_ns: float,
+    low_fraction: float = 0.10,
+    high_fraction: float = 0.90,
+) -> RiseFitResult:
+    """Fit a sigmoid rise to the 10-90% rising edge before the dominant peak."""
+    y = cut.profile_counts
+    if y.size < min_fit_points:
+        return skipped_rise_result(cut, "too_few_points")
+
+    smooth = gaussian_filter1d(y, sigma=smooth_sigma) if smooth_sigma > 0 else y
+    baseline_seed = float(np.percentile(y, 5))
+    low_values = y[y <= np.percentile(y, 25)]
+    noise = max(robust_noise(low_values), math.sqrt(max(baseline_seed, 0.0) + 1.0))
+    signal = smooth - baseline_seed
+    peak_idx = int(np.argmax(signal))
+    peak_height = float(signal[peak_idx])
+    peak_time = float(time_ns[peak_idx])
+    peak_counts = float(y[peak_idx])
+
+    if peak_height <= max(min_peak_sigma * noise, 1.0):
+        return skipped_rise_result(cut, "low_signal", peak_time, peak_counts)
+    if peak_idx < min_fit_points:
+        return skipped_rise_result(cut, "too_few_pre_peak_points", peak_time, peak_counts)
+
+    low_threshold = low_fraction * peak_height
+    high_threshold = high_fraction * peak_height
+    pre_peak = signal[: peak_idx + 1]
+    low_cross_idx = first_sustained_true(pre_peak >= low_threshold, run_length=5)
+    high_cross_idx = first_sustained_true(pre_peak >= high_threshold, run_length=3)
+    if low_cross_idx is None:
+        return skipped_rise_result(cut, "no_10_percent_crossing", peak_time, peak_counts)
+    if high_cross_idx is None:
+        return skipped_rise_result(cut, "no_90_percent_crossing", peak_time, peak_counts)
+    if high_cross_idx <= low_cross_idx:
+        return skipped_rise_result(cut, "invalid_threshold_order", peak_time, peak_counts)
+
+    threshold_10_time = crossing_time(time_ns, signal, low_threshold, peak_idx)
+    threshold_90_time = crossing_time(time_ns, signal, high_threshold, peak_idx)
+    observed_rise_time = (
+        threshold_90_time - threshold_10_time
+        if math.isfinite(threshold_10_time) and math.isfinite(threshold_90_time)
+        else float("nan")
+    )
+
+    margin = max(3, min_fit_points // 4)
+    fit_start_idx = max(0, low_cross_idx - margin)
+    fit_end_idx = min(peak_idx + 1, high_cross_idx + margin + 1)
+    if fit_end_idx - fit_start_idx < min_fit_points:
+        missing = min_fit_points - (fit_end_idx - fit_start_idx)
+        fit_start_idx = max(0, fit_start_idx - math.ceil(missing / 2))
+        fit_end_idx = min(peak_idx + 1, fit_end_idx + math.floor(missing / 2) + 1)
+    if fit_end_idx - fit_start_idx < min_fit_points:
+        return skipped_rise_result(
+            cut,
+            "too_few_rise_fit_points",
+            peak_time,
+            peak_counts,
+            threshold_10_time,
+            threshold_90_time,
+        )
+
+    x_fit = time_ns[fit_start_idx:fit_end_idx]
+    y_fit = y[fit_start_idx:fit_end_idx]
+    dt = float(np.median(np.diff(time_ns))) if time_ns.size > 1 else 1.0
+    k_lower = max(abs(dt) / 100.0, 1.0e-6)
+    baseline0 = max(0.0, float(np.percentile(y_fit[: max(3, min(8, len(y_fit)))], 20)))
+    amplitude0 = max(float(y_fit[-1] - baseline0), 1.0)
+    k0 = observed_rise_time / (2.0 * math.log(9.0)) if math.isfinite(observed_rise_time) and observed_rise_time > 0 else max(dt, tau_min_ns)
+    k0 = min(max(k0, k_lower), tau_max_ns)
+    midpoint0 = (
+        float((threshold_10_time + threshold_90_time) / 2.0)
+        if math.isfinite(threshold_10_time) and math.isfinite(threshold_90_time)
+        else float(x_fit[len(x_fit) // 2])
+    )
+    midpoint0 = min(max(midpoint0, float(x_fit[0])), float(x_fit[-1]))
+
+    try:
+        popt, pcov = curve_fit(
+            sigmoid_rise,
+            x_fit,
+            y_fit,
+            p0=[amplitude0, k0, baseline0, midpoint0],
+            bounds=(
+                [0.0, k_lower, 0.0, float(x_fit[0])],
+                [max(float(np.max(y_fit)) * 3.0, 1.0), tau_max_ns, max(float(np.max(y_fit)), 1.0e-9), float(x_fit[-1])],
+            ),
+            sigma=np.sqrt(np.maximum(y_fit, 1.0)),
+            absolute_sigma=False,
+            maxfev=20000,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return skipped_rise_result(
+            cut,
+            f"fit_failed:{exc}",
+            peak_time,
+            peak_counts,
+            threshold_10_time,
+            threshold_90_time,
+        )
+
+    y_pred = sigmoid_rise(x_fit, float(popt[0]), float(popt[1]), float(popt[2]), float(popt[3]))
+    residual = y_fit - y_pred
+    ss_res = float(np.sum(residual**2))
+    ss_tot = float(np.sum((y_fit - np.mean(y_fit)) ** 2))
+    r_squared = float(1.0 - ss_res / ss_tot) if ss_tot > 0 else float("nan")
+    rmse = float(np.sqrt(np.mean(residual**2)))
+    perr = np.sqrt(np.diag(pcov)) if pcov.size else np.full(4, np.nan)
+    sigmoid_k = float(popt[1])
+    return RiseFitResult(
+        center_nm=cut.center_nm,
+        wavelength_min_nm=cut.wavelength_min_nm,
+        wavelength_max_nm=cut.wavelength_max_nm,
+        column_count=cut.column_count,
+        status="fit",
+        reason="",
+        rise_tau_ns=sigmoid_k,
+        rise_tau_se_ns=float(perr[1]) if len(perr) > 1 else float("nan"),
+        rise_time_10_90_ns=2.0 * math.log(9.0) * sigmoid_k,
+        observed_rise_time_10_90_ns=observed_rise_time,
+        amplitude_counts=float(popt[0]),
+        baseline_counts=float(popt[2]),
+        midpoint_time_ns=float(popt[3]),
+        r_squared=r_squared,
+        rmse_counts=rmse,
+        peak_time_ns=peak_time,
+        peak_counts=peak_counts,
+        threshold_10_time_ns=threshold_10_time,
+        threshold_90_time_ns=threshold_90_time,
+        fit_start_ns=float(x_fit[0]),
+        fit_end_ns=float(x_fit[-1]),
+        fit_points=len(x_fit),
+    )
+
+
 def result_row(band: BandProfile, result: FitResult) -> dict[str, object]:
     """Convert one band fit result to a text-output row."""
     return {
@@ -205,6 +450,64 @@ SUMMARY_FIELDS = [
 ]
 
 
+def rise_result_row(band: BandProfile, result: RiseFitResult) -> dict[str, object]:
+    """Convert one rise-fit result to a text-output row."""
+    return {
+        "band_min_nm": band.requested_min_nm,
+        "band_max_nm": band.requested_max_nm,
+        "band_center_nm": result.center_nm,
+        "actual_wavelength_min_nm": result.wavelength_min_nm,
+        "actual_wavelength_max_nm": result.wavelength_max_nm,
+        "column_count": result.column_count,
+        "status": result.status,
+        "reason": result.reason,
+        "sigmoid_k_ns": result.rise_tau_ns,
+        "sigmoid_k_se_ns": result.rise_tau_se_ns,
+        "fitted_rise_time_10_90_ns": result.rise_time_10_90_ns,
+        "observed_rise_time_10_90_ns": result.observed_rise_time_10_90_ns,
+        "amplitude_counts": result.amplitude_counts,
+        "baseline_counts": result.baseline_counts,
+        "midpoint_time_ns": result.midpoint_time_ns,
+        "r_squared": result.r_squared,
+        "rmse_counts": result.rmse_counts,
+        "peak_time_ns": result.peak_time_ns,
+        "peak_counts": result.peak_counts,
+        "threshold_10_time_ns": result.threshold_10_time_ns,
+        "threshold_90_time_ns": result.threshold_90_time_ns,
+        "fit_start_ns": result.fit_start_ns,
+        "fit_end_ns": result.fit_end_ns,
+        "fit_points": result.fit_points,
+    }
+
+
+RISE_SUMMARY_FIELDS = [
+    "band_min_nm",
+    "band_max_nm",
+    "band_center_nm",
+    "actual_wavelength_min_nm",
+    "actual_wavelength_max_nm",
+    "column_count",
+    "status",
+    "reason",
+    "sigmoid_k_ns",
+    "sigmoid_k_se_ns",
+    "fitted_rise_time_10_90_ns",
+    "observed_rise_time_10_90_ns",
+    "amplitude_counts",
+    "baseline_counts",
+    "midpoint_time_ns",
+    "r_squared",
+    "rmse_counts",
+    "peak_time_ns",
+    "peak_counts",
+    "threshold_10_time_ns",
+    "threshold_90_time_ns",
+    "fit_start_ns",
+    "fit_end_ns",
+    "fit_points",
+]
+
+
 def write_metadata(
     path: Path,
     *,
@@ -217,7 +520,8 @@ def write_metadata(
     wavelength_bounds: tuple[float, float],
     band_edges: list[tuple[float, float]],
     band_count: int,
-    fit_count: int,
+    decay_fit_count: int,
+    rise_fit_count: int,
 ) -> None:
     """Write scan and extraction settings as key-value text."""
     rows = [
@@ -233,7 +537,8 @@ def write_metadata(
         {"key": "first_band_min_nm", "value": band_edges[0][0] if band_edges else ""},
         {"key": "last_band_max_nm", "value": band_edges[-1][1] if band_edges else ""},
         {"key": "band_count", "value": band_count},
-        {"key": "fit_count", "value": fit_count},
+        {"key": "decay_fit_count", "value": decay_fit_count},
+        {"key": "rise_fit_count", "value": rise_fit_count},
     ]
     write_tsv(path, rows, ["key", "value"])
 
@@ -251,6 +556,67 @@ def write_profiles(path: Path, time_ns: np.ndarray, bands: list[BandProfile]) ->
             row[field] = float(band.cut.profile_counts[idx])
         rows.append(row)
     write_tsv(path, rows, fields)
+
+
+def normalized_counts(profile_counts: np.ndarray) -> np.ndarray | None:
+    """Return baseline-subtracted counts normalized to the profile maximum."""
+    baseline = float(np.percentile(profile_counts, 5))
+    shifted = profile_counts.astype(float) - baseline
+    peak = float(np.nanmax(shifted)) if shifted.size else float("nan")
+    if not math.isfinite(peak) or peak <= 0:
+        return None
+    return np.clip(shifted / peak, 0.0, None)
+
+
+def plot_normalized_slices(
+    out_base: Path,
+    time_ns: np.ndarray,
+    bands: list[BandProfile],
+    relative_path: Path,
+) -> None:
+    """Plot all wavelength-cut kinetics normalized within each slice."""
+    normalized: list[tuple[BandProfile, np.ndarray]] = []
+    for band in bands:
+        values = normalized_counts(band.cut.profile_counts)
+        if values is not None:
+            normalized.append((band, values))
+    if not normalized:
+        return
+
+    centers = np.array([band.cut.center_nm for band, _ in normalized], dtype=float)
+    norm = Normalize(vmin=float(np.nanmin(centers)), vmax=float(np.nanmax(centers)))
+    cmap = plt.get_cmap("viridis")
+
+    for yscale, suffix, ylabel in [
+        ("linear", "linear", "Normalized counts"),
+        ("log", "semilog", "Normalized counts"),
+    ]:
+        set_publication_style(base_font_size=8.2)
+        fig, ax = plt.subplots(figsize=DOUBLE_COLUMN_WIDE, constrained_layout=True)
+        for band, values in normalized:
+            label = f"{format_nm(band.requested_min_nm)}-{format_nm(band.requested_max_nm)} nm"
+            y_values = np.clip(values, 1.0e-4, None) if yscale == "log" else values
+            ax.plot(
+                time_ns,
+                y_values,
+                lw=0.85,
+                alpha=0.86,
+                color=cmap(norm(band.cut.center_nm)),
+                label=label,
+            )
+        ax.set_title(relative_path.stem.replace("_", " "), pad=5)
+        ax.set_xlabel("Time (ns)")
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(1.0e-4, 1.08) if yscale == "log" else ax.set_ylim(-0.03, 1.08)
+        ax.set_yscale(yscale)
+        apply_axes_style(ax, grid=True)
+        scalar = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+        scalar.set_array([])
+        colorbar = fig.colorbar(scalar, ax=ax, pad=0.015, fraction=0.035)
+        colorbar.set_label("Band center (nm)")
+        save_figure(fig, out_base.with_name(f"{out_base.name}_{suffix}.png"), dpi=260)
+        save_figure(fig, out_base.with_name(f"{out_base.name}_{suffix}.pdf"))
+        plt.close(fig)
 
 
 def write_fit_curve_points(
@@ -272,6 +638,43 @@ def write_fit_curve_points(
                 result.tau_ns,
                 result.baseline_counts,
                 result.fit_start_ns,
+            )[0]
+            rows.append(
+                {
+                    "band_min_nm": band.requested_min_nm,
+                    "band_max_nm": band.requested_max_nm,
+                    "time_ns": float(time_value),
+                    "raw_counts": float(raw_counts),
+                    "fit_counts": float(fitted_counts),
+                    "residual_counts": float(raw_counts - fitted_counts),
+                }
+            )
+    write_tsv(
+        path,
+        rows,
+        ["band_min_nm", "band_max_nm", "time_ns", "raw_counts", "fit_counts", "residual_counts"],
+    )
+
+
+def write_rise_fit_curve_points(
+    path: Path,
+    time_ns: np.ndarray,
+    bands: list[BandProfile],
+    results: list[RiseFitResult],
+) -> None:
+    """Write raw and fitted sample points used by successful rise fits."""
+    rows: list[dict[str, object]] = []
+    for band, result in zip(bands, results):
+        if result.status != "fit":
+            continue
+        mask = (time_ns >= result.fit_start_ns) & (time_ns <= result.fit_end_ns)
+        for time_value, raw_counts in zip(time_ns[mask], band.cut.profile_counts[mask]):
+            fitted_counts = sigmoid_rise(
+                np.array([time_value], dtype=float),
+                result.amplitude_counts,
+                result.rise_tau_ns,
+                result.baseline_counts,
+                result.midpoint_time_ns,
             )[0]
             rows.append(
                 {
@@ -316,6 +719,7 @@ def process_scan(
     tau_min_ns: float,
     tau_max_ns: float,
     write_fit_curves: bool,
+    write_slice_plots: bool,
 ) -> ScanOutput:
     """Extract and fit wavelength bands for one carpet scan."""
     relative_path = path.relative_to(raw_dir)
@@ -371,8 +775,22 @@ def process_scan(
             )
             for band in bands
         ]
-        fit_count = sum(1 for result in results if result.status == "fit")
-        skipped_count = len(results) - fit_count
+        rise_results = [
+            fit_rise_profile(
+                band.cut,
+                times,
+                smooth_sigma=smooth_sigma,
+                min_fit_points=min_fit_points,
+                min_peak_sigma=min_peak_sigma,
+                tau_min_ns=tau_min_ns,
+                tau_max_ns=tau_max_ns,
+            )
+            for band in bands
+        ]
+        decay_fit_count = sum(1 for result in results if result.status == "fit")
+        decay_skipped_count = len(results) - decay_fit_count
+        rise_fit_count = sum(1 for result in rise_results if result.status == "fit")
+        rise_skipped_count = len(rise_results) - rise_fit_count
 
         write_metadata(
             out_dir / "metadata.txt",
@@ -385,20 +803,31 @@ def process_scan(
             wavelength_bounds=local_bounds,
             band_edges=scan_band_edges,
             band_count=len(bands),
-            fit_count=fit_count,
+            decay_fit_count=decay_fit_count,
+            rise_fit_count=rise_fit_count,
         )
         write_tsv(out_dir / "fit_summary.txt", [result_row(band, result) for band, result in zip(bands, results)], SUMMARY_FIELDS)
+        write_tsv(
+            out_dir / "rise_fit_summary.txt",
+            [rise_result_row(band, result) for band, result in zip(bands, rise_results)],
+            RISE_SUMMARY_FIELDS,
+        )
         write_profiles(out_dir / "profiles_by_band.txt", times, bands)
+        if write_slice_plots:
+            plot_normalized_slices(out_dir / "normalized_slices", times, bands, relative_path)
         if write_fit_curves:
             write_fit_curve_points(out_dir / "fit_curve_points.txt", times, bands, results)
+            write_rise_fit_curve_points(out_dir / "rise_fit_curve_points.txt", times, bands, rise_results)
 
         return ScanOutput(
             source_path=path,
             relative_path=relative_path,
             output_dir=out_dir,
             band_count=len(bands),
-            fit_count=fit_count,
-            skipped_count=skipped_count,
+            decay_fit_count=decay_fit_count,
+            decay_skipped_count=decay_skipped_count,
+            rise_fit_count=rise_fit_count,
+            rise_skipped_count=rise_skipped_count,
             status="ok",
             note="",
         )
@@ -410,8 +839,10 @@ def process_scan(
             relative_path=relative_path,
             output_dir=out_dir,
             band_count=0,
-            fit_count=0,
-            skipped_count=0,
+            decay_fit_count=0,
+            decay_skipped_count=0,
+            rise_fit_count=0,
+            rise_skipped_count=0,
             status="error",
             note=str(exc),
         )
@@ -427,15 +858,27 @@ def write_inventory(path: Path, outputs: list[ScanOutput], raw_dir: Path, output
                 "output_folder": item.output_dir.relative_to(output_root).as_posix(),
                 "status": item.status,
                 "band_count": item.band_count,
-                "fit_count": item.fit_count,
-                "skipped_count": item.skipped_count,
+                "decay_fit_count": item.decay_fit_count,
+                "decay_skipped_count": item.decay_skipped_count,
+                "rise_fit_count": item.rise_fit_count,
+                "rise_skipped_count": item.rise_skipped_count,
                 "note": item.note,
             }
         )
     write_tsv(
         path,
         rows,
-        ["source_file", "output_folder", "status", "band_count", "fit_count", "skipped_count", "note"],
+        [
+            "source_file",
+            "output_folder",
+            "status",
+            "band_count",
+            "decay_fit_count",
+            "decay_skipped_count",
+            "rise_fit_count",
+            "rise_skipped_count",
+            "note",
+        ],
     )
 
 
@@ -465,6 +908,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tau-min-ns", type=float, default=0.03)
     parser.add_argument("--tau-max-ns", type=float, default=200.0)
     parser.add_argument("--no-fit-curves", action="store_true")
+    parser.add_argument("--no-slice-plots", action="store_true")
     args = parser.parse_args(argv)
 
     raw_dir = resolve_path(args.raw_dir)
@@ -518,20 +962,24 @@ def main(argv: list[str] | None = None) -> int:
             tau_min_ns=args.tau_min_ns,
             tau_max_ns=args.tau_max_ns,
             write_fit_curves=not args.no_fit_curves,
+            write_slice_plots=not args.no_slice_plots,
         )
         outputs.append(output)
         print(f"[{index}/{total}] {output.status}: {output.relative_path.as_posix()} -> {output.output_dir.name}")
 
     write_inventory(output_root / "inventory.txt", outputs, raw_dir, output_root)
     ok_count = sum(1 for item in outputs if item.status == "ok")
-    fit_count = sum(item.fit_count for item in outputs)
-    skipped_count = sum(item.skipped_count for item in outputs)
+    decay_fit_count = sum(item.decay_fit_count for item in outputs)
+    decay_skipped_count = sum(item.decay_skipped_count for item in outputs)
+    rise_fit_count = sum(item.rise_fit_count for item in outputs)
+    rise_skipped_count = sum(item.rise_skipped_count for item in outputs)
     print()
     print(f"scans processed: {ok_count} ok / {len(outputs) - ok_count} error / {len(outputs)} total")
     if common_bounds is not None and band_edges is not None:
         print(f"common wavelength coverage: {common_bounds[0]:.6g}-{common_bounds[1]:.6g} nm")
         print(f"clean bands: {band_edges[0][0]:g}-{band_edges[-1][1]:g} nm in {args.interval_nm:g} nm intervals")
-    print(f"fits: {fit_count} fit / {skipped_count} skipped")
+    print(f"decay fits: {decay_fit_count} fit / {decay_skipped_count} skipped")
+    print(f"rise fits: {rise_fit_count} fit / {rise_skipped_count} skipped")
     print(f"output: {output_root}")
     print(f"inventory: {output_root / 'inventory.txt'}")
     return 0 if ok_count == len(outputs) else 1

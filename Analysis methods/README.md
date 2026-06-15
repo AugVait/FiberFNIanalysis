@@ -106,7 +106,7 @@ Outputs are written under `../Analysis results`:
 
 For one-off streak-carpet inspection, edit and run `manual_scripts/manual_carpet_wavelength_cuts.py`. It loads one `.img`, averages wavelength bands at regular centers, detects secondary peaks, fits a single exponential decay to the dominant peak while excluding later secondary peaks, and writes CSV/PNG diagnostics.
 
-For every carpet scan at once, edit and run `manual_scripts/manual_batch_carpet_wavelength_cuts.py`. It writes tab-delimited `.txt` files under `../Analysis results/carpet_wavelength_cuts_20nm_txt`, using clean 20 nm wavelength intervals such as `400-420` nm.
+For every carpet scan at once, edit and run `manual_scripts/manual_batch_carpet_wavelength_cuts.py`. It writes tab-delimited `.txt` files under `../Analysis results/carpet_wavelength_cuts_20nm_txt`, using clean 20 nm wavelength intervals such as `400-420` nm. Each scan folder includes decay-fit and rise-fit summaries; the rise fit is a sigmoid fit to the rising edge with fitted and observed 10-90% rise times. Each scan folder also includes linear and semilog plots of all normalized slice kinetics.
 
 The underlying command-line helper is:
 

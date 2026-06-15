@@ -19,7 +19,7 @@ Each script prints the important settings before it starts. If something looks w
 - `manual_peak_position_shift.py`: calculate PL peak-position shifts from `configs/peak_position_shift.yaml` and plot all selected samples together.
 - `manual_fit_it_decay.py`: fit integrated-time decay traces.
 - `manual_carpet_wavelength_cuts.py`: manually cut one carpet by wavelength and fit decay profiles.
-- `manual_batch_carpet_wavelength_cuts.py`: cut every carpet into clean 20 nm wavelength bands and write one text-output folder per scan.
+- `manual_batch_carpet_wavelength_cuts.py`: cut every carpet into clean 20 nm wavelength bands and write one text-output folder per scan, including separate decay and rise fits.
 
 ## Common Edits
 

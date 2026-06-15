@@ -34,12 +34,14 @@ SECONDARY_PEAK_EXCLUSION_BEFORE_NS = 0.05
 TAU_MIN_NS = 0.03
 TAU_MAX_NS = 200.0
 WRITE_FIT_CURVES = True
+WRITE_SLICE_PLOTS = True
 
 # Examples:
 # WAVELENGTH_MIN_NM = 400.0
 # WAVELENGTH_MAX_NM = 720.0
 # RANGE_MODE = "per-scan"
 # WRITE_FIT_CURVES = False
+# WRITE_SLICE_PLOTS = False
 
 
 # =========================
@@ -63,6 +65,7 @@ def main() -> int:
             ("fit start ns", FIT_START_NS),
             ("fit end ns", FIT_END_NS),
             ("write fit curves", WRITE_FIT_CURVES),
+            ("write slice plots", WRITE_SLICE_PLOTS),
         ],
     )
     args = common_analysis_args() + [
@@ -104,6 +107,7 @@ def main() -> int:
     add_optional(args, "--fit-start-ns", FIT_START_NS)
     add_optional(args, "--fit-end-ns", FIT_END_NS)
     add_flag(args, "--no-fit-curves", not WRITE_FIT_CURVES)
+    add_flag(args, "--no-slice-plots", not WRITE_SLICE_PLOTS)
     return batch_carpet_wavelength_cuts.main(args)
 
 
