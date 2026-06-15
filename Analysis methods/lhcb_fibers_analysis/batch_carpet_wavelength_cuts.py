@@ -96,6 +96,36 @@ def safe_scan_folder(relative_path: Path) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", stem.replace("/", "__")).strip("_")
 
 
+def sample_folder(relative_path: Path) -> str:
+    """Return the sample/irradiation folder for one raw scan."""
+    stem = relative_path.stem.lower()
+    sample_match = re.search(r"(?:^|[^a-z0-9])((?:bcf\d+g?)|(?:scsf\d+))(?=[^a-z0-9]|$)", stem)
+    irradiation_match = re.search(r"_(noir|ir)_", stem)
+    if sample_match and irradiation_match:
+        return f"{sample_match.group(1)}_{irradiation_match.group(1)}"
+    if sample_match:
+        return sample_match.group(1)
+    return "unknown_sample"
+
+
+def scan_time_window(relative_path: Path) -> str:
+    """Return the acquisition time-window token from one scan path."""
+    match = re.search(r"_(\d+(?:ns|us|ms))(?:_|$)", relative_path.stem.lower())
+    return match.group(1) if match else ""
+
+
+def csv_values(values: list[str] | None) -> set[str]:
+    """Parse repeated or comma-separated scalar filters."""
+    if not values:
+        return set()
+    return {
+        item.strip().lower()
+        for value in values
+        for item in value.split(",")
+        if item.strip()
+    }
+
+
 def format_nm(value: float) -> str:
     """Format a wavelength edge for stable column labels."""
     if float(value).is_integer():
@@ -558,44 +588,60 @@ def write_profiles(path: Path, time_ns: np.ndarray, bands: list[BandProfile]) ->
     write_tsv(path, rows, fields)
 
 
-def normalized_counts(profile_counts: np.ndarray) -> np.ndarray | None:
-    """Return baseline-subtracted counts normalized to the profile maximum."""
-    baseline = float(np.percentile(profile_counts, 5))
-    shifted = profile_counts.astype(float) - baseline
-    peak = float(np.nanmax(shifted)) if shifted.size else float("nan")
-    if not math.isfinite(peak) or peak <= 0:
+def finite_profile_range(bands: list[BandProfile]) -> tuple[float, float] | None:
+    """Return finite y limits for raw profile plots."""
+    finite_values = np.concatenate(
+        [band.cut.profile_counts[np.isfinite(band.cut.profile_counts)] for band in bands if band.cut.profile_counts.size]
+    )
+    if finite_values.size == 0:
         return None
-    return np.clip(shifted / peak, 0.0, None)
+    y_min = float(np.nanmin(finite_values))
+    y_max = float(np.nanmax(finite_values))
+    if not math.isfinite(y_min) or not math.isfinite(y_max):
+        return None
+    if y_min == y_max:
+        padding = max(abs(y_min) * 0.05, 1.0)
+    else:
+        padding = 0.04 * (y_max - y_min)
+    return y_min - padding, y_max + padding
 
 
-def plot_normalized_slices(
+def plot_raw_slices(
     out_base: Path,
     time_ns: np.ndarray,
     bands: list[BandProfile],
+    results: list[FitResult],
     relative_path: Path,
 ) -> None:
-    """Plot all wavelength-cut kinetics normalized within each slice."""
-    normalized: list[tuple[BandProfile, np.ndarray]] = []
-    for band in bands:
-        values = normalized_counts(band.cut.profile_counts)
-        if values is not None:
-            normalized.append((band, values))
-    if not normalized:
+    """Plot non-noise wavelength-cut kinetics as raw mean counts."""
+    if not bands:
+        return
+    plotted_bands = [
+        band
+        for band, result in zip(bands, results)
+        if not (result.status == "skipped" and result.reason == "low_signal")
+    ]
+    if not plotted_bands:
         return
 
-    centers = np.array([band.cut.center_nm for band, _ in normalized], dtype=float)
+    centers = np.array([band.cut.center_nm for band in plotted_bands], dtype=float)
     norm = Normalize(vmin=float(np.nanmin(centers)), vmax=float(np.nanmax(centers)))
     cmap = plt.get_cmap("viridis")
+    raw_ylim = finite_profile_range(plotted_bands)
 
     for yscale, suffix, ylabel in [
-        ("linear", "linear", "Normalized counts"),
-        ("log", "semilog", "Normalized counts"),
+        ("linear", "linear", "Mean counts"),
+        ("log", "semilog", "Mean counts"),
     ]:
         set_publication_style(base_font_size=8.2)
         fig, ax = plt.subplots(figsize=DOUBLE_COLUMN_WIDE, constrained_layout=True)
-        for band, values in normalized:
+        plotted = False
+        for band in plotted_bands:
             label = f"{format_nm(band.requested_min_nm)}-{format_nm(band.requested_max_nm)} nm"
-            y_values = np.clip(values, 1.0e-4, None) if yscale == "log" else values
+            values = band.cut.profile_counts.astype(float)
+            y_values = np.where(values > 0, values, np.nan) if yscale == "log" else values
+            if not np.isfinite(y_values).any():
+                continue
             ax.plot(
                 time_ns,
                 y_values,
@@ -604,10 +650,15 @@ def plot_normalized_slices(
                 color=cmap(norm(band.cut.center_nm)),
                 label=label,
             )
+            plotted = True
+        if not plotted:
+            plt.close(fig)
+            continue
         ax.set_title(relative_path.stem.replace("_", " "), pad=5)
         ax.set_xlabel("Time (ns)")
         ax.set_ylabel(ylabel)
-        ax.set_ylim(1.0e-4, 1.08) if yscale == "log" else ax.set_ylim(-0.03, 1.08)
+        if yscale == "linear" and raw_ylim is not None:
+            ax.set_ylim(*raw_ylim)
         ax.set_yscale(yscale)
         apply_axes_style(ax, grid=True)
         scalar = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
@@ -616,6 +667,26 @@ def plot_normalized_slices(
         colorbar.set_label("Band center (nm)")
         save_figure(fig, out_base.with_name(f"{out_base.name}_{suffix}.png"), dpi=260)
         save_figure(fig, out_base.with_name(f"{out_base.name}_{suffix}.pdf"))
+        plt.close(fig)
+
+
+def plot_individual_cut_profiles(
+    out_dir: Path,
+    time_ns: np.ndarray,
+    bands: list[BandProfile],
+) -> None:
+    """Write one simple raw-count plot for each wavelength cut."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for band in bands:
+        set_publication_style(base_font_size=8.0)
+        fig, ax = plt.subplots(figsize=(4.2, 2.8), constrained_layout=True)
+        ax.plot(time_ns, band.cut.profile_counts, color="#0072B2", lw=1.0)
+        ax.set_title(f"{format_nm(band.requested_min_nm)}-{format_nm(band.requested_max_nm)} nm", pad=4)
+        ax.set_xlabel("Time (ns)")
+        ax.set_ylabel("Mean counts")
+        apply_axes_style(ax, grid=True)
+        path = out_dir / f"cut_{format_nm(band.requested_min_nm)}_{format_nm(band.requested_max_nm)}nm.png"
+        save_figure(fig, path, dpi=220)
         plt.close(fig)
 
 
@@ -723,7 +794,7 @@ def process_scan(
 ) -> ScanOutput:
     """Extract and fit wavelength bands for one carpet scan."""
     relative_path = path.relative_to(raw_dir)
-    out_dir = output_root / safe_scan_folder(relative_path)
+    out_dir = output_root / sample_folder(relative_path) / safe_scan_folder(relative_path)
     try:
         carpet = load_img(path)
         wavelengths = wavelength_axis_nm(carpet)
@@ -814,7 +885,8 @@ def process_scan(
         )
         write_profiles(out_dir / "profiles_by_band.txt", times, bands)
         if write_slice_plots:
-            plot_normalized_slices(out_dir / "normalized_slices", times, bands, relative_path)
+            plot_raw_slices(out_dir / "raw_slices", times, bands, results, relative_path)
+            plot_individual_cut_profiles(out_dir / "cut_profiles", times, bands)
         if write_fit_curves:
             write_fit_curve_points(out_dir / "fit_curve_points.txt", times, bands, results)
             write_rise_fit_curve_points(out_dir / "rise_fit_curve_points.txt", times, bands, rise_results)
@@ -855,6 +927,7 @@ def write_inventory(path: Path, outputs: list[ScanOutput], raw_dir: Path, output
         rows.append(
             {
                 "source_file": item.relative_path.as_posix(),
+                "sample": sample_folder(item.relative_path),
                 "output_folder": item.output_dir.relative_to(output_root).as_posix(),
                 "status": item.status,
                 "band_count": item.band_count,
@@ -870,6 +943,7 @@ def write_inventory(path: Path, outputs: list[ScanOutput], raw_dir: Path, output
         rows,
         [
             "source_file",
+            "sample",
             "output_folder",
             "status",
             "band_count",
@@ -890,6 +964,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out-subdir", default=DEFAULT_OUT_SUBDIR)
     parser.add_argument("--interval-nm", type=float, default=DEFAULT_INTERVAL_NM)
     parser.add_argument("--range-mode", choices=["common", "per-scan"], default="common")
+    parser.add_argument(
+        "--time-window",
+        "--time-windows",
+        dest="time_windows",
+        action="append",
+        default=None,
+        help="Keep only selected acquisition windows, e.g. --time-window 2ns --time-window 10ns.",
+    )
     parser.add_argument("--wavelength-min-nm", type=float, default=None)
     parser.add_argument("--wavelength-max-nm", type=float, default=None)
     parser.add_argument("--top-edge-crop-rows", type=int, default=TOP_EDGE_CROP_ROWS)
@@ -915,7 +997,12 @@ def main(argv: list[str] | None = None) -> int:
     results_dir = resolve_path(args.results_dir)
     output_root = (results_dir / args.out_subdir).resolve()
     paths = sorted(path for path in raw_dir.rglob("*.img") if ".venv" not in path.parts)
+    selected_windows = csv_values(args.time_windows)
+    if selected_windows:
+        paths = [path for path in paths if scan_time_window(path.relative_to(raw_dir)) in selected_windows]
     if not paths:
+        if selected_windows:
+            raise SystemExit(f"No .img scans found under {raw_dir} for time window(s): {', '.join(sorted(selected_windows))}")
         raise SystemExit(f"No .img scans found under {raw_dir}")
 
     band_edges: list[tuple[float, float]] | None
@@ -965,7 +1052,10 @@ def main(argv: list[str] | None = None) -> int:
             write_slice_plots=not args.no_slice_plots,
         )
         outputs.append(output)
-        print(f"[{index}/{total}] {output.status}: {output.relative_path.as_posix()} -> {output.output_dir.name}")
+        print(
+            f"[{index}/{total}] {output.status}: "
+            f"{output.relative_path.as_posix()} -> {output.output_dir.relative_to(output_root).as_posix()}"
+        )
 
     write_inventory(output_root / "inventory.txt", outputs, raw_dir, output_root)
     ok_count = sum(1 for item in outputs if item.status == "ok")

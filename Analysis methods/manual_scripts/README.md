@@ -20,6 +20,7 @@ Each script prints the important settings before it starts. If something looks w
 - `manual_fit_it_decay.py`: fit integrated-time decay traces.
 - `manual_carpet_wavelength_cuts.py`: manually cut one carpet by wavelength and fit decay profiles.
 - `manual_batch_carpet_wavelength_cuts.py`: cut every carpet into clean 20 nm wavelength bands and write one text-output folder per scan, including separate decay and rise fits.
+- `manual_wavelength_cut_fit_results.py`: collect final 2 ns rise-time fits and 10 ns decay-time fits into separate result folders with one QA plot per fit; both final fit families are forced for every wavelength slice, including low-signal noise slices.
 
 ## Common Edits
 
@@ -28,6 +29,7 @@ Each script prints the important settings before it starts. If something looks w
 - `X_MIN_NM` and `X_MAX_NM` in `manual_pl_spectra.py` override the PL plot wavelength axis without editing every spectrum YAML file.
 - `configs/peak_position_shift.yaml` controls peak smoothing, local peak refinement, and explicitly omitted points for `manual_peak_position_shift.py`.
 - `INTERVAL_NM`, `RANGE_MODE`, `WAVELENGTH_MIN_NM`, and `WAVELENGTH_MAX_NM` in `manual_batch_carpet_wavelength_cuts.py` control the clean wavelength bands used for all carpet text exports.
+- `RISE_WINDOW` and `DECAY_WINDOW` in `manual_wavelength_cut_fit_results.py` choose which carpet windows feed the final rise and decay fit result folders.
 - `CARPET_TIME_WINDOWS`, `IT_TIME_WINDOW`, `PL_X_MIN_NM`, and `PL_X_MAX_NM` in `manual_run_all.py` pass the same controls into the full workflow.
 
 Each script includes commented examples directly below its editable settings. Copy an example line, uncomment it, and adjust the value for the current run.

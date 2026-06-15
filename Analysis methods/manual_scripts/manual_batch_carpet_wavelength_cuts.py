@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from manual_common import RESULTS_DIR, add_flag, add_optional, common_analysis_args, show_settings, use_methods_package
+from manual_common import (
+    RESULTS_DIR,
+    add_flag,
+    add_optional,
+    add_repeated,
+    common_analysis_args,
+    show_settings,
+    use_methods_package,
+)
 
 
 # =========================
@@ -11,10 +19,11 @@ from manual_common import RESULTS_DIR, add_flag, add_optional, common_analysis_a
 
 OUT_SUBDIR = "carpet_wavelength_cuts_20nm_txt"
 
+TIME_WINDOWS = ("2ns", "10ns")
 INTERVAL_NM = 20.0
 RANGE_MODE = "common"  # "common" keeps the same clean bands for every scan; "per-scan" uses each scan's full range.
-WAVELENGTH_MIN_NM = None
-WAVELENGTH_MAX_NM = None
+WAVELENGTH_MIN_NM = 380.0
+WAVELENGTH_MAX_NM = 720.0
 TOP_EDGE_CROP_ROWS = 12
 
 SMOOTH_SIGMA = 2.0
@@ -37,6 +46,8 @@ WRITE_FIT_CURVES = True
 WRITE_SLICE_PLOTS = True
 
 # Examples:
+# TIME_WINDOWS = ("2ns", "10ns")
+# TIME_WINDOWS = None
 # WAVELENGTH_MIN_NM = 400.0
 # WAVELENGTH_MAX_NM = 720.0
 # RANGE_MODE = "per-scan"
@@ -58,6 +69,7 @@ def main() -> int:
         "Manual batch carpet wavelength cuts",
         [
             ("output", RESULTS_DIR / OUT_SUBDIR),
+            ("time windows", TIME_WINDOWS),
             ("interval nm", INTERVAL_NM),
             ("range mode", RANGE_MODE),
             ("wavelength min nm", WAVELENGTH_MIN_NM),
@@ -102,6 +114,7 @@ def main() -> int:
         "--tau-max-ns",
         str(TAU_MAX_NS),
     ]
+    add_repeated(args, "--time-window", TIME_WINDOWS)
     add_optional(args, "--wavelength-min-nm", WAVELENGTH_MIN_NM)
     add_optional(args, "--wavelength-max-nm", WAVELENGTH_MAX_NM)
     add_optional(args, "--fit-start-ns", FIT_START_NS)

@@ -90,7 +90,8 @@ Outputs are written under `../Analysis results`:
 - `pl_spectra_raw`: raw-intensity PL plots and inventory.
 - `peak_position_shift`: selected PL peak-position shifts, table, and all-sample plot.
 - `it_decay_fits_all_it_10ns_window`: all `IT_*.dat` decay fits using a 10 ns fit window, matrices, plot PDFs/PNGs, and method note.
-- `carpet_wavelength_cuts_20nm_txt`: text-only 20 nm wavelength cuts for every Hamamatsu carpet, with one folder per scan.
+- `carpet_wavelength_cuts_20nm_txt`: text-only 20 nm wavelength cuts for selected Hamamatsu carpets, organized by sample.
+- `wavelength_cut_fit_results_2ns_rise_10ns_decay`: selected 2 ns rise-time fits and 10 ns decay-time fits with one QA plot per successful fit.
 
 ## Analysis Notes
 
@@ -106,7 +107,9 @@ Outputs are written under `../Analysis results`:
 
 For one-off streak-carpet inspection, edit and run `manual_scripts/manual_carpet_wavelength_cuts.py`. It loads one `.img`, averages wavelength bands at regular centers, detects secondary peaks, fits a single exponential decay to the dominant peak while excluding later secondary peaks, and writes CSV/PNG diagnostics.
 
-For every carpet scan at once, edit and run `manual_scripts/manual_batch_carpet_wavelength_cuts.py`. It writes tab-delimited `.txt` files under `../Analysis results/carpet_wavelength_cuts_20nm_txt`, using clean 20 nm wavelength intervals such as `400-420` nm. Each scan folder includes decay-fit and rise-fit summaries; the rise fit is a sigmoid fit to the rising edge with fitted and observed 10-90% rise times. Each scan folder also includes linear and semilog plots of all normalized slice kinetics.
+For every carpet scan at once, edit and run `manual_scripts/manual_batch_carpet_wavelength_cuts.py`. It writes tab-delimited `.txt` files under `../Analysis results/carpet_wavelength_cuts_20nm_txt`, organized by sample and using clean 20 nm wavelength intervals such as `400-420` nm. The manual wrapper is currently limited to 2 ns and 10 ns carpets, using intervals from 380 nm through 720 nm. Each scan folder includes decay-fit and rise-fit summaries; the rise fit is a sigmoid fit to the rising edge with fitted and observed 10-90% rise times. Each scan folder also includes simple per-cut inspection plots and linear/semilog summary plots of raw slice intensities, omitting wavelength bands classified as low-signal noise.
+
+To collect the final fit outputs, run `manual_scripts/manual_wavelength_cut_fit_results.py`. It uses 2 ns wavelength cuts for rise-time fits and 10 ns wavelength cuts for decay-time fits, writing separate summary tables and one visual QA plot per fit under `../Analysis results/wavelength_cut_fit_results_2ns_rise_10ns_decay`. The final result builder forces a fit for every wavelength slice, including slices that the batch diagnostic marked as low-signal noise. The tables include `sample`, `position`, and `interval` columns for filtering, plus per-sample position-by-interval matrices under `tabulated_by_sample`.
 
 The underlying command-line helper is:
 
