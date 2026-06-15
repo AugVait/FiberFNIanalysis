@@ -21,6 +21,7 @@ Each script prints the important settings before it starts. If something looks w
 - `manual_carpet_wavelength_cuts.py`: manually cut one carpet by wavelength and fit decay profiles.
 - `manual_batch_carpet_wavelength_cuts.py`: cut every carpet into clean 20 nm wavelength bands and write one text-output folder per scan, including separate decay and rise fits.
 - `manual_wavelength_cut_fit_results.py`: collect final 2 ns rise-time fits and 10 ns decay-time fits into separate result folders with one QA plot per fit; both final fit families are forced for every wavelength slice, including low-signal noise slices.
+- `manual_wavelength_cut_summary_plots.py`: plot sample-wise point grids for rise and decay fit times, with wavelength intervals as columns and positions as rows.
 
 ## Common Edits
 

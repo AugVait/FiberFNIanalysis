@@ -111,6 +111,8 @@ For every carpet scan at once, edit and run `manual_scripts/manual_batch_carpet_
 
 To collect the final fit outputs, run `manual_scripts/manual_wavelength_cut_fit_results.py`. It uses 2 ns wavelength cuts for rise-time fits and 10 ns wavelength cuts for decay-time fits, writing separate summary tables and one visual QA plot per fit under `../Analysis results/wavelength_cut_fit_results_2ns_rise_10ns_decay`. The final result builder forces a fit for every wavelength slice, including slices that the batch diagnostic marked as low-signal noise. The tables include `sample`, `position`, and `interval` columns for filtering, plus per-sample position-by-interval matrices under `tabulated_by_sample`.
 
+To review all fit results by sample, run `manual_scripts/manual_wavelength_cut_summary_plots.py`. It writes point-grid summary plots under `../Analysis results/wavelength_cut_fit_results_2ns_rise_10ns_decay/summary_point_grids`, with wavelength intervals as columns and fiber positions as rows. Replicate files at the same grid cell are slightly jittered so every fit result remains visible.
+
 The underlying command-line helper is:
 
 ```powershell
