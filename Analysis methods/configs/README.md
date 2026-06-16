@@ -3,6 +3,7 @@
 These YAML files are part of the Git-synced method definition.
 
 - `run_all.yaml`: chooses which analysis families run, points to the other config files, and can optionally override carpet time windows, IT trace discovery window, and PL wavelength-axis limits.
+- `snakemake.yaml`: workflow orchestration settings for Snakemake targets, including output roots, wavelength-cut split-job settings, and downstream target options.
 - `carpets.yaml`: Hamamatsu carpet quicklook settings, including output subfolder, top-edge crop, and the detailed scan-config directory.
 - `fiber_names.yaml`: maps experimental result names such as `bcf1_noir` to real fiber names for generated plot labels and result tables.
 - `peak_position_shift.yaml`: PL peak-position-shift settings, including output subfolder, selected PL config folder, smoothing/refinement settings, and explicit point exclusions.
@@ -11,6 +12,7 @@ These YAML files are part of the Git-synced method definition.
 - `it_decay_fits_all_it_10ns_window/*.yaml`: integrated-time trace metadata by sample group for the all-IT analysis. These files limit fitting only if `fit_all_discovered_traces` is set to `false`.
 - `it_decay_fits_10ns.yaml`: legacy 10 ns filename-only integrated-time decay fitting settings.
 - `pl_spectra/*.yaml`: curated PL spectrum membership and plotting metadata by sample group.
+- `wavelength_cut_selections/decay_time_10ns/*.txt`: tracked manual selection matrices used by reproducible summary grids, leading-edge reports, and selected double-exponential decay fits.
 
 Paths inside `run_all.yaml`, `carpets.yaml`, IT decay config YAML files, and `peak_position_shift.yaml` are relative to this `configs` folder unless absolute paths are used. Paths inside `carpets/*.yaml`, IT trace metadata YAML folders, and `pl_spectra/*.yaml` are relative to the raw-data directory passed with `--raw-dir`.
 

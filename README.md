@@ -29,10 +29,14 @@ py -3.12 -m venv .venv
 
 If the raw-data check fails, the copied data does not match the manifest synced through Git.
 
-After the check passes, the easiest way to rebuild outputs is the manual wrapper:
+After the check passes, the preferred way to rebuild tracked analysis outputs is Snakemake:
 
 ```powershell
-.\.venv\Scripts\python.exe .\manual_scripts\manual_run_all.py
+cd "Analysis methods"
+.\.venv\Scripts\python.exe -m snakemake --dry-run --cores 1
+.\.venv\Scripts\python.exe -m snakemake --cores 4
 ```
 
-The manual scripts live in `Analysis methods\manual_scripts`. Edit the preamble at the top of a script when you want a narrower run.
+Useful named targets include `core_results`, `wavelength_cut_results`, `summary_grids`, and `double_exp_results`.
+
+The manual scripts still live in `Analysis methods\manual_scripts` for one-off runs. Edit the preamble at the top of a script when you want a narrower manual run.

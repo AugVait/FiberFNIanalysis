@@ -1,6 +1,6 @@
 # Manual Analysis Scripts
 
-These are the easiest entry points for day-to-day analysis. Open one file, edit the small preamble near the top, and run it. No command-line flags are needed.
+Snakemake is the preferred reproducible entry point for full rebuilds. These manual scripts remain useful for one-off analysis runs: open one file, edit the small preamble near the top, and run it. No command-line flags are needed.
 
 Start with the full workflow:
 

@@ -1,0 +1,10 @@
+# Keep Snakemake's source cache out of the Windows user-profile cache. This
+# makes the workflow work in restricted local sessions while preserving normal
+# file-based inputs, outputs, metadata, and software-deployment assumptions.
+shared-fs-usage:
+  - input-output
+  - persistence
+  - software-deployment
+  - software-deployment-cache
+  - sources
+  - storage-local-copies

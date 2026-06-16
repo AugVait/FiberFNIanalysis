@@ -9,6 +9,9 @@
 # Local Python environments and caches inside the tracked methods folder.
 /Analysis methods/.venv/
 /Analysis methods/.tmp/
+/Analysis methods/.snakemake/
+/Analysis methods/logs/
+/Analysis methods/benchmarks/
 /Analysis methods/.pytest_cache/
 /Analysis methods/**/__pycache__/
 /Analysis methods/**/*.py[cod]

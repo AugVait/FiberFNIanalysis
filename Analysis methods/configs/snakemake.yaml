@@ -1,0 +1,58 @@
+# Snakemake orchestration settings. Paths are relative to the Analysis methods
+# folder unless absolute paths are supplied.
+
+raw_dir: "../raw data"
+results_dir: "../Analysis results"
+manifest: "raw_data_manifest.json"
+run_all_config: "configs/run_all.yaml"
+
+workflow_status_dir: "../Analysis results/workflow_status"
+
+wavelength_cuts:
+  out_subdir: "carpet_wavelength_cuts_20nm_txt"
+  time_windows: ["2ns", "10ns"]
+  interval_nm: 20.0
+  range_mode: "common"
+  wavelength_min_nm: 380.0
+  wavelength_max_nm: 720.0
+  top_edge_crop_rows: 12
+  smooth_sigma: 2.0
+  fit_start_ns: null
+  fit_start_offset_ns: 0.05
+  fit_end_ns: null
+  end_fraction: 0.05
+  min_fit_points: 20
+  min_peak_sigma: 5.0
+  secondary_peak_height_fraction: 0.20
+  secondary_peak_prominence_fraction: 0.12
+  secondary_peak_noise_sigma: 3.0
+  secondary_peak_min_separation_ns: 0.25
+  secondary_peak_exclusion_before_ns: 0.05
+  tau_min_ns: 0.03
+  tau_max_ns: 200.0
+  write_fit_curves: true
+  write_slice_plots: true
+
+wavelength_cut_fit_results:
+  cuts_subdir: "carpet_wavelength_cuts_20nm_txt"
+  out_subdir: "wavelength_cut_fit_results_2ns_rise_10ns_decay"
+  rise_window: "2ns"
+  decay_window: "10ns"
+  selection_dir: "configs/wavelength_cut_selections/decay_time_10ns"
+
+summary_grids:
+  out_subdir: "summary grids"
+
+leading_edge:
+  rise_window: "2ns"
+
+double_exp:
+  decay_window: "10ns"
+
+decay_tau_slice_position:
+  out_subdir: "decay_tau_slice_position_visuals"
+  time_windows: ["2ns", "10ns"]
+
+decay_tau_slice_position_10ns_only:
+  out_subdir: "decay_tau_slice_position_10ns_only"
+  time_windows: ["10ns"]

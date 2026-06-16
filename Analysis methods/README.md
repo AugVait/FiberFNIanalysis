@@ -40,7 +40,25 @@ Commit the updated `raw_data_manifest.json` with the analysis-method changes tha
 
 ## Reproduce Results
 
-For routine use, prefer the manual script. It has an editable preamble at the top and prints the selected settings before it starts:
+Prefer Snakemake for reproducible rebuilds:
+
+```powershell
+.\.venv\Scripts\python.exe -m snakemake --dry-run --cores 1
+.\.venv\Scripts\python.exe -m snakemake --cores 4
+```
+
+Useful named targets:
+
+```powershell
+.\.venv\Scripts\python.exe -m snakemake core_results --cores 4
+.\.venv\Scripts\python.exe -m snakemake wavelength_cut_results --cores 4
+.\.venv\Scripts\python.exe -m snakemake summary_grids --cores 1
+.\.venv\Scripts\python.exe -m snakemake double_exp_results --cores 1
+```
+
+Snakemake reads `configs/snakemake.yaml`, checks `raw_data_manifest.json`, and writes generated outputs under `../Analysis results`. The tracked wavelength-cut selection matrices live under `configs/wavelength_cut_selections`.
+
+The manual script remains available for direct one-shot runs. It has an editable preamble at the top and prints the selected settings before it starts:
 
 ```powershell
 .\.venv\Scripts\python.exe .\manual_scripts\manual_run_all.py

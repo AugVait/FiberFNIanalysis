@@ -12,3 +12,4 @@ lmfit
 pybaselines
 tqdm
 ipykernel
+snakemake>=9,<10

@@ -36,7 +36,25 @@ The raw-data check must pass before reproducing results. For the current manifes
 
 ## 4. Rebuild All Results
 
-The most convenient route is the manual wrapper script:
+The preferred route is Snakemake:
+
+```powershell
+.\.venv\Scripts\python.exe -m snakemake --dry-run --cores 1
+.\.venv\Scripts\python.exe -m snakemake --cores 4
+```
+
+Useful named targets:
+
+```powershell
+.\.venv\Scripts\python.exe -m snakemake core_results --cores 4
+.\.venv\Scripts\python.exe -m snakemake wavelength_cut_results --cores 4
+.\.venv\Scripts\python.exe -m snakemake summary_grids --cores 1
+.\.venv\Scripts\python.exe -m snakemake double_exp_results --cores 1
+```
+
+Snakemake reads `configs/snakemake.yaml`, checks `raw_data_manifest.json`, and writes generated outputs under `..\Analysis results`.
+
+The manual wrapper script remains available:
 
 ```powershell
 .\.venv\Scripts\python.exe .\manual_scripts\manual_run_all.py

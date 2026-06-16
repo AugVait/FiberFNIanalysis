@@ -197,6 +197,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fit-subdir", default=DEFAULT_OUT_SUBDIR)
     parser.add_argument("--rise-window", default="2ns")
     parser.add_argument("--selection-subdir", default="manual selections")
+    parser.add_argument(
+        "--selection-dir",
+        type=Path,
+        default=None,
+        help="Read-only directory containing tracked decay-time selection matrices.",
+    )
     parser.add_argument("--fiber-names-config", type=Path, default=DEFAULT_FIBER_NAMES_CONFIG)
     args = parser.parse_args(argv)
 
@@ -204,6 +210,11 @@ def main(argv: list[str] | None = None) -> int:
     cuts_dir = results_dir / args.cuts_subdir
     fit_dir = results_dir / args.fit_subdir
     out_dir = fit_dir / "leading_edge_position_2ns"
+    selection_dir = (
+        resolve_path(args.selection_dir)
+        if args.selection_dir is not None
+        else fit_dir / args.selection_subdir / "decay_time_10ns"
+    )
     rows = build_rows(cuts_dir=cuts_dir, rise_window=args.rise_window)
 
     csv_path = out_dir / "leading_edge_position_20_80_2ns.csv"
@@ -226,8 +237,9 @@ def main(argv: list[str] | None = None) -> int:
         title_prefix="Leading edge position",
         out_dir=fit_dir / "summary grids" / "leading_edge_position_2ns",
         fiber_names=fiber_names,
-        selection_dir=fit_dir / args.selection_subdir / "decay_time_10ns",
+        selection_dir=selection_dir,
         selection_suffix="decay_time_10ns_by_position_interval",
+        create_missing_selections=args.selection_dir is None,
         use_standard_deviation_limits=True,
     )
 
@@ -246,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"leading-edge rows ({args.rise_window}): {len(rows)}")
     print(f"csv: {csv_path}")
     print(f"summary plots: {fit_dir / 'summary grids' / 'leading_edge_position_2ns'}")
+    print(f"manual selections: {selection_dir}")
     return 0
 
 

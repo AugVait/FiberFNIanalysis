@@ -1,0 +1,501 @@
+from __future__ import annotations
+
+import importlib
+import sys
+from pathlib import Path
+
+configfile: "configs/snakemake.yaml"
+
+METHODS_ROOT = Path(workflow.basedir).resolve()
+if str(METHODS_ROOT) not in sys.path:
+    sys.path.insert(0, str(METHODS_ROOT))
+
+from lhcb_fibers_analysis.batch_carpet_wavelength_cuts import sample_folder
+from lhcb_fibers_analysis.raw_data_manifest import check_manifest
+from lhcb_fibers_analysis.workflow_bridge import (
+    aggregate_wavelength_cut_inventory,
+    build_common_band_edges,
+    run_wavelength_cut_scan,
+    scan_id,
+    selected_img_relative_paths,
+)
+from lhcb_fibers_analysis.yaml_config import bool_value, read_yaml_mapping, string_value
+
+
+def smk_path(path: Path) -> str:
+    return path.resolve().as_posix()
+
+
+def resolve_path(value: str | Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else (METHODS_ROOT / path).resolve()
+
+
+def config_path(config_root: Path, value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else (config_root / path).resolve()
+
+
+def optional_value(value):
+    return None if value is None or value == "" else value
+
+
+def optional_float(value):
+    value = optional_value(value)
+    return None if value is None else float(value)
+
+
+def yaml_files(path: Path) -> list[str]:
+    return [smk_path(item) for item in sorted(path.glob("*.yaml"))] if path.exists() else []
+
+
+def append_optional(args: list[str], name: str, value) -> None:
+    if value is not None and value != "":
+        args.extend([name, str(value)])
+
+
+def append_repeated(args: list[str], name: str, values) -> None:
+    if values is None or values == "":
+        return
+    if isinstance(values, str):
+        values = [item.strip() for item in values.split(",") if item.strip()]
+    for value in values:
+        args.extend([name, str(value)])
+
+
+def run_main(module_name: str, args: list[str]) -> None:
+    analysis_module = importlib.import_module(f"lhcb_fibers_analysis.{module_name}")
+    result = analysis_module.main([str(arg) for arg in args])
+    if result not in {None, 0}:
+        raise RuntimeError(f"{module_name} failed with exit code {result}")
+
+
+RAW_DIR = resolve_path(config.get("raw_dir", "../raw data"))
+RESULTS_DIR = resolve_path(config.get("results_dir", "../Analysis results"))
+MANIFEST = resolve_path(config.get("manifest", "raw_data_manifest.json"))
+RUN_ALL_CONFIG = resolve_path(config.get("run_all_config", "configs/run_all.yaml"))
+STATUS_DIR = resolve_path(config.get("workflow_status_dir", "../Analysis results/workflow_status"))
+SNAKEMAKE_CONFIG = METHODS_ROOT / "configs" / "snakemake.yaml"
+
+RUN_ALL = read_yaml_mapping(RUN_ALL_CONFIG)
+RUN_CONFIG_ROOT = RUN_ALL_CONFIG.parent
+
+CARPETS_CONFIG = config_path(RUN_CONFIG_ROOT, string_value(RUN_ALL, "carpets_config", "carpets.yaml"))
+IT_DECAY_CONFIG = config_path(RUN_CONFIG_ROOT, string_value(RUN_ALL, "it_decay_config", "it_decay_fits_10ns.yaml"))
+PEAK_CONFIG = config_path(RUN_CONFIG_ROOT, string_value(RUN_ALL, "peak_position_shift_config", "peak_position_shift.yaml"))
+PL_CONFIG_DIR = config_path(RUN_CONFIG_ROOT, string_value(RUN_ALL, "pl_config_dir", "pl_spectra"))
+FIBER_NAMES_CONFIG = config_path(RUN_CONFIG_ROOT, string_value(RUN_ALL, "fiber_names_config", "fiber_names.yaml"))
+
+CARPETS_SETTINGS = read_yaml_mapping(CARPETS_CONFIG)
+IT_SETTINGS = read_yaml_mapping(IT_DECAY_CONFIG)
+PEAK_SETTINGS = read_yaml_mapping(PEAK_CONFIG)
+
+CARPET_SCAN_CONFIG_DIR = config_path(CARPETS_CONFIG.parent, string_value(CARPETS_SETTINGS, "scan_config_dir", "carpets"))
+IT_TRACE_CONFIG_DIR = config_path(IT_DECAY_CONFIG.parent, string_value(IT_SETTINGS, "trace_config_dir", "it_decay_fits_10ns"))
+PEAK_PL_CONFIG_DIR = config_path(PEAK_CONFIG.parent, string_value(PEAK_SETTINGS, "pl_config_dir", "pl_spectra"))
+
+CARPET_INVENTORY = RESULTS_DIR / string_value(CARPETS_SETTINGS, "out_subdir", "carpets") / "carpet_inventory.csv"
+PL_NORMALIZED_INVENTORY = RESULTS_DIR / "pl_spectra" / "pl_spectra_inventory.csv"
+PL_RAW_INVENTORY = RESULTS_DIR / "pl_spectra_raw" / "pl_spectra_inventory.csv"
+PEAK_SHIFT_TABLE = RESULTS_DIR / string_value(PEAK_SETTINGS, "out_subdir", "peak_position_shift") / "peak_position_shift.csv"
+IT_DECAY_INVENTORY = RESULTS_DIR / string_value(IT_SETTINGS, "out_subdir", "it_decay_fits_10ns") / "fit_inventory.csv"
+
+WAVELENGTH_CUTS = config["wavelength_cuts"]
+WAVELENGTH_FITS = config["wavelength_cut_fit_results"]
+SUMMARY_GRIDS = config["summary_grids"]
+LEADING_EDGE = config["leading_edge"]
+DOUBLE_EXP = config["double_exp"]
+DECAY_TAU = config["decay_tau_slice_position"]
+DECAY_TAU_10NS = config["decay_tau_slice_position_10ns_only"]
+
+WAVELENGTH_CUTS_OUT_SUBDIR = WAVELENGTH_CUTS["out_subdir"]
+CUTS_DIR = RESULTS_DIR / WAVELENGTH_CUTS_OUT_SUBDIR
+CUTS_INVENTORY = CUTS_DIR / "inventory.txt"
+FIT_RESULTS_DIR = RESULTS_DIR / WAVELENGTH_FITS["out_subdir"]
+FIT_RESULTS_INVENTORY = FIT_RESULTS_DIR / "fit_result_inventory.txt"
+SUMMARY_GRIDS_MARKER = STATUS_DIR / "summary_grids.done"
+LEADING_EDGE_INVENTORY = FIT_RESULTS_DIR / "leading_edge_position_inventory.txt"
+DOUBLE_EXP_INVENTORY = FIT_RESULTS_DIR / "double_exp_fit_result_inventory.txt"
+DECAY_TAU_AGGREGATE = RESULTS_DIR / DECAY_TAU["out_subdir"] / "aggregated_decay_tau_by_slice.txt"
+DECAY_TAU_10NS_AGGREGATE = RESULTS_DIR / DECAY_TAU_10NS["out_subdir"] / "aggregated_decay_tau_by_slice.txt"
+VERIFY_MARKER = STATUS_DIR / "verify_raw_data.done"
+BAND_EDGES_JSON = STATUS_DIR / "wavelength_cut_band_edges.json"
+
+SELECTION_DIR = resolve_path(WAVELENGTH_FITS["selection_dir"])
+SELECTION_FILES = [smk_path(item) for item in sorted(SELECTION_DIR.glob("*_selection.txt"))]
+
+CODE_FILES = [smk_path(item) for item in sorted((METHODS_ROOT / "lhcb_fibers_analysis").glob("*.py"))]
+RUN_ALL_INPUTS = [smk_path(RUN_ALL_CONFIG), smk_path(SNAKEMAKE_CONFIG)]
+
+SCAN_RELATIVE_PATHS = selected_img_relative_paths(MANIFEST, WAVELENGTH_CUTS.get("time_windows"))
+SCAN_RECORDS = [
+    {
+        "sample": sample_folder(relative_path),
+        "scan_id": scan_id(relative_path),
+        "relative_path": relative_path,
+    }
+    for relative_path in SCAN_RELATIVE_PATHS
+]
+SCAN_BY_KEY = {
+    (record["sample"], record["scan_id"]): record["relative_path"]
+    for record in SCAN_RECORDS
+}
+SCAN_STATUS_JSONS = [
+    smk_path(STATUS_DIR / "wavelength_cut_scans" / record["sample"] / f"{record['scan_id']}.json")
+    for record in SCAN_RECORDS
+]
+SCAN_OUTPUT_DIRS = [
+    smk_path(CUTS_DIR / record["sample"] / record["scan_id"])
+    for record in SCAN_RECORDS
+]
+
+CORE_TARGETS = []
+if bool_value(RUN_ALL, "run_carpets", True):
+    CORE_TARGETS.append(smk_path(CARPET_INVENTORY))
+if bool_value(RUN_ALL, "run_pl_normalized", True):
+    CORE_TARGETS.append(smk_path(PL_NORMALIZED_INVENTORY))
+if bool_value(RUN_ALL, "run_pl_raw", True):
+    CORE_TARGETS.append(smk_path(PL_RAW_INVENTORY))
+if bool_value(RUN_ALL, "run_peak_position_shift", True):
+    CORE_TARGETS.append(smk_path(PEAK_SHIFT_TABLE))
+if bool_value(RUN_ALL, "run_it_decay", True):
+    CORE_TARGETS.append(smk_path(IT_DECAY_INVENTORY))
+
+ALL_TARGETS = CORE_TARGETS + [
+    smk_path(CUTS_INVENTORY),
+    smk_path(FIT_RESULTS_INVENTORY),
+    smk_path(SUMMARY_GRIDS_MARKER),
+    smk_path(LEADING_EDGE_INVENTORY),
+    smk_path(DOUBLE_EXP_INVENTORY),
+    smk_path(DECAY_TAU_AGGREGATE),
+    smk_path(DECAY_TAU_10NS_AGGREGATE),
+]
+
+
+rule all:
+    input:
+        ALL_TARGETS
+
+
+rule core_results:
+    input:
+        CORE_TARGETS
+
+
+rule wavelength_cut_results:
+    input:
+        smk_path(CUTS_INVENTORY),
+        smk_path(FIT_RESULTS_INVENTORY)
+
+
+rule double_exp_results:
+    input:
+        smk_path(DOUBLE_EXP_INVENTORY)
+
+
+rule verify_raw_data:
+    input:
+        manifest=smk_path(MANIFEST)
+    output:
+        marker=smk_path(VERIFY_MARKER)
+    run:
+        result = check_manifest(RAW_DIR, MANIFEST)
+        if not result.ok:
+            raise RuntimeError(f"Raw data does not match manifest: {MANIFEST}")
+        marker = Path(output.marker)
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("raw data check: OK\n", encoding="utf-8")
+
+
+rule carpets:
+    input:
+        verified=smk_path(VERIFY_MARKER),
+        config=smk_path(CARPETS_CONFIG),
+        fiber_names=smk_path(FIBER_NAMES_CONFIG),
+        scan_configs=yaml_files(CARPET_SCAN_CONFIG_DIR),
+        run_configs=RUN_ALL_INPUTS,
+        code=CODE_FILES
+    output:
+        inventory=smk_path(CARPET_INVENTORY)
+    run:
+        args = [
+            "--raw-dir", RAW_DIR,
+            "--results-dir", RESULTS_DIR,
+            "--config", CARPETS_CONFIG,
+            "--fiber-names-config", FIBER_NAMES_CONFIG,
+        ]
+        append_repeated(args, "--time-window", string_value(RUN_ALL, "carpet_time_windows", ""))
+        run_main("visualize_carpets", args)
+
+
+rule pl_spectra_normalized:
+    input:
+        verified=smk_path(VERIFY_MARKER),
+        config_dir=yaml_files(PL_CONFIG_DIR),
+        fiber_names=smk_path(FIBER_NAMES_CONFIG),
+        run_configs=RUN_ALL_INPUTS,
+        code=CODE_FILES
+    output:
+        inventory=smk_path(PL_NORMALIZED_INVENTORY)
+    run:
+        args = [
+            "--raw-dir", RAW_DIR,
+            "--results-dir", RESULTS_DIR,
+            "--config-dir", PL_CONFIG_DIR,
+            "--fiber-names-config", FIBER_NAMES_CONFIG,
+            "--intensity-mode", "normalized",
+        ]
+        append_optional(args, "--x-min-nm", string_value(RUN_ALL, "pl_x_min_nm", ""))
+        append_optional(args, "--x-max-nm", string_value(RUN_ALL, "pl_x_max_nm", ""))
+        run_main("plot_pl_spectra", args)
+
+
+rule pl_spectra_raw:
+    input:
+        verified=smk_path(VERIFY_MARKER),
+        config_dir=yaml_files(PL_CONFIG_DIR),
+        fiber_names=smk_path(FIBER_NAMES_CONFIG),
+        run_configs=RUN_ALL_INPUTS,
+        code=CODE_FILES
+    output:
+        inventory=smk_path(PL_RAW_INVENTORY)
+    run:
+        args = [
+            "--raw-dir", RAW_DIR,
+            "--results-dir", RESULTS_DIR,
+            "--config-dir", PL_CONFIG_DIR,
+            "--fiber-names-config", FIBER_NAMES_CONFIG,
+            "--intensity-mode", "raw",
+        ]
+        append_optional(args, "--x-min-nm", string_value(RUN_ALL, "pl_x_min_nm", ""))
+        append_optional(args, "--x-max-nm", string_value(RUN_ALL, "pl_x_max_nm", ""))
+        run_main("plot_pl_spectra", args)
+
+
+rule peak_position_shift:
+    input:
+        verified=smk_path(VERIFY_MARKER),
+        config=smk_path(PEAK_CONFIG),
+        pl_configs=yaml_files(PEAK_PL_CONFIG_DIR),
+        fiber_names=smk_path(FIBER_NAMES_CONFIG),
+        run_configs=RUN_ALL_INPUTS,
+        code=CODE_FILES
+    output:
+        table=smk_path(PEAK_SHIFT_TABLE)
+    run:
+        args = [
+            "--raw-dir", RAW_DIR,
+            "--results-dir", RESULTS_DIR,
+            "--config", PEAK_CONFIG,
+            "--fiber-names-config", FIBER_NAMES_CONFIG,
+        ]
+        run_main("peak_position_shift", args)
+
+
+rule it_decay:
+    input:
+        verified=smk_path(VERIFY_MARKER),
+        config=smk_path(IT_DECAY_CONFIG),
+        trace_configs=yaml_files(IT_TRACE_CONFIG_DIR),
+        fiber_names=smk_path(FIBER_NAMES_CONFIG),
+        run_configs=RUN_ALL_INPUTS,
+        code=CODE_FILES
+    output:
+        inventory=smk_path(IT_DECAY_INVENTORY)
+    run:
+        args = [
+            "--raw-dir", RAW_DIR,
+            "--results-dir", RESULTS_DIR,
+            "--config", IT_DECAY_CONFIG,
+            "--fiber-names-config", FIBER_NAMES_CONFIG,
+        ]
+        append_optional(args, "--time-window", string_value(RUN_ALL, "it_time_window", ""))
+        run_main("fit_it_decay", args)
+
+
+rule wavelength_cut_band_edges:
+    input:
+        verified=smk_path(VERIFY_MARKER),
+        manifest=smk_path(MANIFEST),
+        config=smk_path(SNAKEMAKE_CONFIG),
+        code=CODE_FILES
+    output:
+        band_edges=smk_path(BAND_EDGES_JSON)
+    run:
+        build_common_band_edges(
+            raw_dir=RAW_DIR,
+            relative_paths=SCAN_RELATIVE_PATHS,
+            interval_nm=float(WAVELENGTH_CUTS["interval_nm"]),
+            wavelength_min_nm=optional_float(WAVELENGTH_CUTS.get("wavelength_min_nm")),
+            wavelength_max_nm=optional_float(WAVELENGTH_CUTS.get("wavelength_max_nm")),
+            out_json=Path(output.band_edges),
+        )
+
+
+rule wavelength_cut_scan:
+    input:
+        raw=lambda wildcards: smk_path(RAW_DIR / SCAN_BY_KEY[(wildcards.sample, wildcards.scan_id)]),
+        band_edges=smk_path(BAND_EDGES_JSON),
+        config=smk_path(SNAKEMAKE_CONFIG),
+        code=CODE_FILES
+    output:
+        status=smk_path(STATUS_DIR / "wavelength_cut_scans" / "{sample}" / "{scan_id}.json"),
+        scan_dir=directory(smk_path(CUTS_DIR / "{sample}" / "{scan_id}"))
+    run:
+        relative_path = SCAN_BY_KEY[(wildcards.sample, wildcards.scan_id)]
+        run_wavelength_cut_scan(
+            raw_dir=RAW_DIR,
+            results_dir=RESULTS_DIR,
+            relative_path=relative_path,
+            band_edges_json=Path(input.band_edges),
+            out_subdir=WAVELENGTH_CUTS_OUT_SUBDIR,
+            interval_nm=float(WAVELENGTH_CUTS["interval_nm"]),
+            range_mode=str(WAVELENGTH_CUTS["range_mode"]),
+            wavelength_min_nm=optional_float(WAVELENGTH_CUTS.get("wavelength_min_nm")),
+            wavelength_max_nm=optional_float(WAVELENGTH_CUTS.get("wavelength_max_nm")),
+            top_edge_crop_rows=int(WAVELENGTH_CUTS["top_edge_crop_rows"]),
+            smooth_sigma=float(WAVELENGTH_CUTS["smooth_sigma"]),
+            fit_start_ns=optional_float(WAVELENGTH_CUTS.get("fit_start_ns")),
+            fit_start_offset_ns=float(WAVELENGTH_CUTS["fit_start_offset_ns"]),
+            fit_end_ns=optional_float(WAVELENGTH_CUTS.get("fit_end_ns")),
+            end_fraction=float(WAVELENGTH_CUTS["end_fraction"]),
+            min_fit_points=int(WAVELENGTH_CUTS["min_fit_points"]),
+            min_peak_sigma=float(WAVELENGTH_CUTS["min_peak_sigma"]),
+            secondary_peak_height_fraction=float(WAVELENGTH_CUTS["secondary_peak_height_fraction"]),
+            secondary_peak_prominence_fraction=float(WAVELENGTH_CUTS["secondary_peak_prominence_fraction"]),
+            secondary_peak_noise_sigma=float(WAVELENGTH_CUTS["secondary_peak_noise_sigma"]),
+            secondary_peak_min_separation_ns=float(WAVELENGTH_CUTS["secondary_peak_min_separation_ns"]),
+            secondary_peak_exclusion_before_ns=float(WAVELENGTH_CUTS["secondary_peak_exclusion_before_ns"]),
+            tau_min_ns=float(WAVELENGTH_CUTS["tau_min_ns"]),
+            tau_max_ns=float(WAVELENGTH_CUTS["tau_max_ns"]),
+            write_fit_curves=bool(WAVELENGTH_CUTS["write_fit_curves"]),
+            write_slice_plots=bool(WAVELENGTH_CUTS["write_slice_plots"]),
+            status_json=Path(output.status),
+        )
+
+
+rule wavelength_cut_inventory:
+    input:
+        status=SCAN_STATUS_JSONS,
+        scan_dirs=SCAN_OUTPUT_DIRS
+    output:
+        inventory=smk_path(CUTS_INVENTORY)
+    run:
+        aggregate_wavelength_cut_inventory(
+            scan_status_jsons=[Path(item) for item in input.status],
+            inventory_path=Path(output.inventory),
+        )
+
+
+rule wavelength_cut_fit_results:
+    input:
+        inventory=smk_path(CUTS_INVENTORY),
+        code=CODE_FILES
+    output:
+        inventory=smk_path(FIT_RESULTS_INVENTORY)
+    run:
+        args = [
+            "--results-dir", RESULTS_DIR,
+            "--cuts-subdir", WAVELENGTH_FITS["cuts_subdir"],
+            "--out-subdir", WAVELENGTH_FITS["out_subdir"],
+            "--rise-window", WAVELENGTH_FITS["rise_window"],
+            "--decay-window", WAVELENGTH_FITS["decay_window"],
+        ]
+        run_main("wavelength_cut_fit_results", args)
+
+
+rule summary_grids:
+    input:
+        inventory=smk_path(FIT_RESULTS_INVENTORY),
+        selections=SELECTION_FILES,
+        fiber_names=smk_path(FIBER_NAMES_CONFIG),
+        code=CODE_FILES
+    output:
+        marker=smk_path(SUMMARY_GRIDS_MARKER)
+    run:
+        args = [
+            "--results-dir", RESULTS_DIR,
+            "--fit-subdir", WAVELENGTH_FITS["out_subdir"],
+            "--out-subdir", SUMMARY_GRIDS["out_subdir"],
+            "--selection-dir", SELECTION_DIR,
+            "--fiber-names-config", FIBER_NAMES_CONFIG,
+        ]
+        run_main("wavelength_cut_summary_plots", args)
+        marker = Path(output.marker)
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("summary grids: OK\n", encoding="utf-8")
+
+
+rule leading_edge_report:
+    input:
+        inventory=smk_path(CUTS_INVENTORY),
+        selections=SELECTION_FILES,
+        fiber_names=smk_path(FIBER_NAMES_CONFIG),
+        code=CODE_FILES
+    output:
+        inventory=smk_path(LEADING_EDGE_INVENTORY)
+    run:
+        args = [
+            "--results-dir", RESULTS_DIR,
+            "--cuts-subdir", WAVELENGTH_FITS["cuts_subdir"],
+            "--fit-subdir", WAVELENGTH_FITS["out_subdir"],
+            "--rise-window", LEADING_EDGE["rise_window"],
+            "--selection-dir", SELECTION_DIR,
+            "--fiber-names-config", FIBER_NAMES_CONFIG,
+        ]
+        run_main("leading_edge_position_report", args)
+
+
+rule double_exp_fit_results:
+    input:
+        inventory=smk_path(CUTS_INVENTORY),
+        selections=SELECTION_FILES,
+        code=CODE_FILES
+    output:
+        inventory=smk_path(DOUBLE_EXP_INVENTORY)
+    run:
+        args = [
+            "--results-dir", RESULTS_DIR,
+            "--cuts-subdir", WAVELENGTH_FITS["cuts_subdir"],
+            "--out-subdir", WAVELENGTH_FITS["out_subdir"],
+            "--decay-window", DOUBLE_EXP["decay_window"],
+            "--decay-model", "double",
+            "--selection-dir", SELECTION_DIR,
+        ]
+        run_main("wavelength_cut_fit_results", args)
+
+
+rule decay_tau_slice_position:
+    input:
+        inventory=smk_path(CUTS_INVENTORY),
+        fiber_names=smk_path(FIBER_NAMES_CONFIG),
+        code=CODE_FILES
+    output:
+        aggregate=smk_path(DECAY_TAU_AGGREGATE)
+    run:
+        args = [
+            "--results-dir", RESULTS_DIR,
+            "--cuts-subdir", WAVELENGTH_FITS["cuts_subdir"],
+            "--out-subdir", DECAY_TAU["out_subdir"],
+            "--fiber-names-config", FIBER_NAMES_CONFIG,
+        ]
+        append_repeated(args, "--time-window", DECAY_TAU.get("time_windows"))
+        run_main("plot_decay_tau_slice_position", args)
+
+
+rule decay_tau_slice_position_10ns_only:
+    input:
+        inventory=smk_path(CUTS_INVENTORY),
+        fiber_names=smk_path(FIBER_NAMES_CONFIG),
+        code=CODE_FILES
+    output:
+        aggregate=smk_path(DECAY_TAU_10NS_AGGREGATE)
+    run:
+        args = [
+            "--results-dir", RESULTS_DIR,
+            "--cuts-subdir", WAVELENGTH_FITS["cuts_subdir"],
+            "--out-subdir", DECAY_TAU_10NS["out_subdir"],
+            "--fiber-names-config", FIBER_NAMES_CONFIG,
+        ]
+        append_repeated(args, "--time-window", DECAY_TAU_10NS.get("time_windows"))
+        run_main("plot_decay_tau_slice_position", args)

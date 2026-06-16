@@ -25,7 +25,8 @@ from .plot_style import COLORS, apply_axes_style, save_figure, set_publication_s
 
 DEFAULT_CUTS_SUBDIR = "carpet_wavelength_cuts_20nm_txt"
 DEFAULT_OUT_SUBDIR = "wavelength_cut_fit_results_2ns_rise_10ns_decay"
-DECAY_MODEL_LABEL = "Model: y = A exp[-(t-t0)/tau], B = 0"
+DECAY_BACKGROUND_PIXELS = 8
+DECAY_MODEL_LABEL = "Model: y = A exp[-(t-t0)/tau] + B_bg"
 DOUBLE_DECAY_MODEL_LABEL = "Model: y = A1 exp[-dt/tau1] + A2 exp[-dt/tau2], B = 0"
 DECAY_SELECTION_SUFFIX = "_decay_time_10ns_by_position_interval_selection.txt"
 DECAY_FIT_END_OVERRIDES_NS = {
@@ -140,6 +141,17 @@ def plus_minus(value: float) -> str:
     return f"+/- {value:.3g} ns" if math.isfinite(value) else "+/- n/a"
 
 
+def initial_background_counts(counts: np.ndarray, pixel_count: int = DECAY_BACKGROUND_PIXELS) -> float:
+    """Estimate fixed background from the first finite trace pixels."""
+    first_pixels = counts[: max(1, pixel_count)]
+    finite = first_pixels[np.isfinite(first_pixels)]
+    if finite.size == 0:
+        finite = counts[np.isfinite(counts)]
+    if finite.size == 0:
+        return 0.0
+    return max(0.0, float(np.nanmedian(finite)))
+
+
 def manual_fit_end_index(time_ns: np.ndarray, fit_start_idx: int, fit_end_ns: float) -> int | None:
     """Return an exclusive fit-end index for one manual time limit."""
     end_idx = int(np.searchsorted(time_ns, fit_end_ns, side="right"))
@@ -178,6 +190,7 @@ def plot_decay_fit(path: Path, time_ns: np.ndarray, counts: np.ndarray, row: pd.
         [
             counts[np.isfinite(counts) & (counts > 0)],
             y_dense[np.isfinite(y_dense) & (y_dense > 0)],
+            np.array([baseline]) if math.isfinite(baseline) and baseline > 0 else np.array([], dtype=float),
         ]
     )
 
@@ -188,6 +201,8 @@ def plot_decay_fit(path: Path, time_ns: np.ndarray, counts: np.ndarray, row: pd.
     ax.axvline(float(row["peak_time_ns"]), color=COLORS["blue"], ls=":", lw=0.9, label="peak")
     ax.axvspan(fit_start, fit_end, color=COLORS["vermillion"], alpha=0.08, lw=0)
     ax.plot(x_dense, y_dense, color=COLORS["vermillion"], lw=1.45, label=f"decay fit ({plus_minus(tau_se)})")
+    if math.isfinite(baseline) and baseline > 0:
+        ax.axhline(baseline, color=COLORS["teal"], ls="--", lw=1.0, label=f"background ({baseline:.3g})")
     ax.set_yscale("log", nonpositive="clip")
     if positive_values.size:
         ax.set_ylim(max(float(np.min(positive_values)) * 0.8, 1.0e-6), float(np.max(positive_values)) * 1.25)
@@ -382,8 +397,8 @@ def forced_decay_fit_row(
     """Fit one decay profile even when the batch diagnostic marked it as low-signal."""
     y = counts.astype(float)
     smooth = gaussian_filter1d(y, sigma=2.0)
-    baseline_seed = max(0.0, float(np.nanpercentile(y, 5)))
-    signal = smooth - baseline_seed
+    background = initial_background_counts(y)
+    signal = smooth - background
     peak_idx = int(np.nanargmax(signal))
     peak_height = float(signal[peak_idx])
     peak_time = float(time_ns[peak_idx])
@@ -392,7 +407,7 @@ def forced_decay_fit_row(
     start_candidates = np.where(time_ns >= fit_start_time)[0]
     fit_start_idx = int(start_candidates[0]) if start_candidates.size else min(peak_idx + 1, len(time_ns) - 1)
 
-    threshold = baseline_seed + 0.05 * max(peak_height, 0.0)
+    threshold = background + 0.05 * max(peak_height, 0.0)
     below = smooth[fit_start_idx:] <= threshold
     sustained_idx = first_sustained_true(below, run_length=8)
     fit_end_idx = len(time_ns) if sustained_idx is None else fit_start_idx + sustained_idx
@@ -415,9 +430,7 @@ def forced_decay_fit_row(
     x_fit = time_ns[fit_start_idx:fit_end_idx]
     y_fit = y[fit_start_idx:fit_end_idx]
     t0 = float(x_fit[0])
-    tail = y_fit[max(0, int(0.8 * len(y_fit))) :]
-    baseline0 = max(0.0, float(np.nanpercentile(tail, 20)))
-    amplitude0 = max(float(y_fit[0]), float(np.nanmax(y_fit) - baseline0), 1.0e-6)
+    amplitude0 = max(float(y_fit[0] - background), float(np.nanmax(y_fit) - background), 1.0e-6)
     duration = max(float(x_fit[-1] - x_fit[0]), 0.03)
     tau0 = min(max(duration / 3.0, 0.03), 200.0)
 
@@ -425,7 +438,7 @@ def forced_decay_fit_row(
     fit_note = ""
     try:
         popt, pcov = curve_fit(
-            lambda x_data, amplitude, tau_ns: exp_decay(x_data, amplitude, tau_ns, 0.0, t0),
+            lambda x_data, amplitude, tau_ns: exp_decay(x_data, amplitude, tau_ns, background, t0),
             x_fit,
             y_fit,
             p0=[amplitude0, tau0],
@@ -440,7 +453,7 @@ def forced_decay_fit_row(
         popt = np.array([amplitude0, tau0], dtype=float)
         pcov = np.full((2, 2), np.nan)
 
-    y_pred = exp_decay(x_fit, float(popt[0]), float(popt[1]), 0.0, t0)
+    y_pred = exp_decay(x_fit, float(popt[0]), float(popt[1]), background, t0)
     residual = y_fit - y_pred
     ss_res = float(np.sum(residual**2))
     ss_tot = float(np.sum((y_fit - np.mean(y_fit)) ** 2))
@@ -456,7 +469,7 @@ def forced_decay_fit_row(
     forced["tau_ns"] = float(popt[1])
     forced["tau_se_ns"] = float(perr[1]) if len(perr) > 1 else float("nan")
     forced["amplitude_counts"] = float(popt[0])
-    forced["baseline_counts"] = 0.0
+    forced["baseline_counts"] = background
     forced["r_squared"] = r_squared
     forced["rmse_counts"] = rmse
     forced["peak_time_ns"] = peak_time
@@ -1060,6 +1073,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--decay-window", default="10ns")
     parser.add_argument("--decay-model", choices=["single", "double"], default="single")
     parser.add_argument("--selection-subdir", default="manual selections")
+    parser.add_argument(
+        "--selection-dir",
+        type=Path,
+        default=None,
+        help="Read-only directory containing tracked decay-time selection matrices.",
+    )
     args = parser.parse_args(argv)
 
     results_dir = resolve_path(args.results_dir)
@@ -1073,7 +1092,11 @@ def main(argv: list[str] | None = None) -> int:
         entries = list(csv.DictReader(handle, delimiter="\t"))
 
     if args.decay_model == "double":
-        selection_dir = output_root / args.selection_subdir / "decay_time_10ns"
+        selection_dir = (
+            resolve_path(args.selection_dir)
+            if args.selection_dir is not None
+            else output_root / args.selection_subdir / "decay_time_10ns"
+        )
         selected = read_decay_manual_selection(selection_dir)
         selected_scan_keys = {(sample, position) for sample, position, _ in selected}
         selected_entries = [
@@ -1123,6 +1146,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"selected manual cells: {len(selected)}")
         print(f"double-exp decay fits ({args.decay_window}): {len(double_decay_rows)}")
         print(f"output: {output_root / 'decay_time_10ns_double_exp'}")
+        print(f"manual selections: {selection_dir}")
         return 0
 
     rise_rows: list[dict[str, object]] = []

@@ -4,7 +4,6 @@ import argparse
 from pathlib import Path
 
 import matplotlib
-from matplotlib import cm
 from matplotlib import colors as mcolors
 from matplotlib.patches import Rectangle
 
@@ -112,9 +111,17 @@ def read_selection_table(path: Path) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["position", "interval"])
 
 
-def apply_manual_selection(frame: pd.DataFrame, selection_path: Path) -> pd.DataFrame:
+def apply_manual_selection(
+    frame: pd.DataFrame,
+    selection_path: Path,
+    *,
+    create_missing_selection: bool = True,
+) -> pd.DataFrame:
     """Keep only rows enabled in the matching manual selection matrix."""
-    ensure_selection_table(selection_path, frame)
+    if create_missing_selection:
+        ensure_selection_table(selection_path, frame)
+    elif not selection_path.exists():
+        raise SystemExit(f"Missing manual selection matrix: {selection_path}")
     selected = read_selection_table(selection_path)
     if selected.empty:
         return frame.iloc[0:0].copy()
@@ -207,7 +214,7 @@ def plot_sample_grid(
     height = max(6.2, 0.78 * len(positions) + 2.7)
     set_publication_style(base_font_size=10.0)
     fig, ax = plt.subplots(figsize=(width, height), constrained_layout=True)
-    colormap = cm.get_cmap("managua")
+    colormap = matplotlib.colormaps["managua"]
     lower = float(color_min) if color_min is not None else float(np.nanmin(color_values))
     upper = float(color_max) if color_max is not None else float(np.nanmax(color_values))
     if not np.isfinite(lower):
@@ -267,7 +274,12 @@ def plot_sample_grid(
     ax.set_title(f"{title_prefix}: {sample_name}", pad=5)
     apply_axes_style(ax, grid=True, minor_ticks=False)
     ax.set_axisbelow(True)
-    colorbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=colormap), ax=ax, pad=0.015, fraction=0.035)
+    colorbar = fig.colorbar(
+        matplotlib.cm.ScalarMappable(norm=norm, cmap=colormap),
+        ax=ax,
+        pad=0.015,
+        fraction=0.035,
+    )
     colorbar.set_label(value_label)
     save_figure(fig, out_base.with_suffix(".png"), dpi=260)
     save_figure(fig, out_base.with_suffix(".pdf"))
@@ -285,6 +297,7 @@ def write_summary_plots(
     fiber_names: FiberNameMap,
     selection_dir: Path,
     selection_suffix: str,
+    create_missing_selections: bool = True,
     outlier_threshold: float | None = None,
     color_min: float | None = None,
     color_max: float | None = None,
@@ -298,7 +311,11 @@ def write_summary_plots(
     for sample in sorted(frame["sample"].dropna().unique(), key=fiber_names.real_name):
         sample_frame = frame[frame["sample"] == sample].copy()
         selection_path = selection_dir / f"{sample}_{selection_suffix}_selection.txt"
-        sample_frame = apply_manual_selection(sample_frame, selection_path)
+        sample_frame = apply_manual_selection(
+            sample_frame,
+            selection_path,
+            create_missing_selection=create_missing_selections,
+        )
         selected_frames[sample] = sample_frame
         if not sample_frame.empty:
             selected_values.append(sample_frame)
@@ -339,6 +356,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fit-subdir", default=DEFAULT_OUT_SUBDIR)
     parser.add_argument("--out-subdir", default="summary grids")
     parser.add_argument("--selection-subdir", default="manual selections")
+    parser.add_argument(
+        "--selection-dir",
+        type=Path,
+        default=None,
+        help="Read-only directory containing tracked decay-time selection matrices.",
+    )
     parser.add_argument("--fiber-names-config", type=Path, default=DEFAULT_FIBER_NAMES_CONFIG)
     args = parser.parse_args(argv)
 
@@ -347,7 +370,12 @@ def main(argv: list[str] | None = None) -> int:
     fiber_names = read_fiber_name_map(fiber_names_config)
     fit_dir = results_dir / args.fit_subdir
     out_root = fit_dir / args.out_subdir
-    selection_root = fit_dir / args.selection_subdir
+    selection_dir = (
+        resolve_path(args.selection_dir)
+        if args.selection_dir is not None
+        else fit_dir / args.selection_subdir / "decay_time_10ns"
+    )
+    create_missing_selections = args.selection_dir is None
     rise_count = write_summary_plots(
         table_path=fit_dir / "rise_time_2ns" / "rise_time_fits_2ns.txt",
         value_column="fitted_rise_time_10_90_ns",
@@ -356,8 +384,9 @@ def main(argv: list[str] | None = None) -> int:
         title_prefix="Rise time",
         out_dir=out_root / "rise_time_2ns",
         fiber_names=fiber_names,
-        selection_dir=selection_root / "decay_time_10ns",
+        selection_dir=selection_dir,
         selection_suffix="decay_time_10ns_by_position_interval",
+        create_missing_selections=create_missing_selections,
         use_standard_deviation_limits=True,
     )
     decay_count = write_summary_plots(
@@ -368,15 +397,16 @@ def main(argv: list[str] | None = None) -> int:
         title_prefix="Decay time",
         out_dir=out_root / "decay_time_10ns",
         fiber_names=fiber_names,
-        selection_dir=selection_root / "decay_time_10ns",
+        selection_dir=selection_dir,
         selection_suffix="decay_time_10ns_by_position_interval",
+        create_missing_selections=create_missing_selections,
         outlier_threshold=3.5,
         use_standard_deviation_limits=True,
     )
     print(f"rise summary plots: {rise_count}")
     print(f"decay summary plots: {decay_count}")
     print(f"output: {out_root}")
-    print(f"manual selections: {selection_root}")
+    print(f"manual selections: {selection_dir}")
     print(f"fiber names: {fiber_names_config}")
     return 0
 
