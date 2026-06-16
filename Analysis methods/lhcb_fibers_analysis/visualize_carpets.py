@@ -341,13 +341,13 @@ def save_individual(record: CarpetRecord, config: CarpetConfig, fiber_names: Fib
     )
     ax_img.set_xlabel("Wavelength (nm)" if wavelengths_nm is not None else "x pixel")
     ax_img.set_ylabel("Time (ns)" if times_ns is not None else "y pixel")
-    colorbar = fig.colorbar(im, ax=ax_img, fraction=0.035, pad=0.02, label="Asinh contrast")
+    colorbar = fig.colorbar(im, ax=ax_img, fraction=0.035, pad=0.02, label="PL signal (a.u.)")
     style_colorbar(colorbar)
 
     row_axis = times_ns if times_ns is not None else np.arange(shown.shape[0])
     ax_row.plot(row_profile, row_axis, color=COLORS["teal"], linewidth=0.9)
     ax_row.set_title("Row mean", pad=4)
-    ax_row.set_xlabel("Asinh contrast")
+    ax_row.set_xlabel("Normalized signal")
     ax_row.set_ylabel("Time (ns)" if times_ns is not None else "y pixel")
     if visible_time_ns is not None:
         ax_row.set_ylim(0, visible_time_ns)
@@ -357,7 +357,7 @@ def save_individual(record: CarpetRecord, config: CarpetConfig, fiber_names: Fib
     ax_col.plot(col_axis, col_profile, color=COLORS["blue"], linewidth=0.9)
     ax_col.set_title("Column mean", pad=4)
     ax_col.set_xlabel("Wavelength (nm)" if wavelengths_nm is not None else "x pixel")
-    ax_col.set_ylabel("Asinh contrast")
+    ax_col.set_ylabel("Normalized signal")
     if extent is not None:
         ax_col.set_xlim(extent[0], extent[1])
     apply_axes_style(ax_col, grid=True)
@@ -588,7 +588,7 @@ def write_html(
 </head>
 <body>
   <h1>Hamamatsu Carpet Visualizations</h1>
-  <p>Loaded {len(records)} configured streak-camera carpets; {len(selected_records)} are selected for figure output. Individual quicklooks crop the top {config.top_edge_crop_rows} rows, use asinh contrast, and compute row/column mean profiles from that same cropped/scaled view.</p>
+  <p>Loaded {len(records)} configured streak-camera carpets; {len(selected_records)} are selected for figure output. Individual quicklooks crop the top {config.top_edge_crop_rows} rows, use normalized signal, and compute row/column mean profiles from that same cropped/scaled view.</p>
   <p>X axes use the spectrograph wavelength calibration in nm. Y axes use the streak-camera time range in ns, scaled to the visible rows after the top-edge crop.</p>
   <h2>Contact Sheets</h2>
   <ul>{sheet_links}</ul>

@@ -4,6 +4,9 @@ import argparse
 from pathlib import Path
 
 import matplotlib
+from matplotlib import cm
+from matplotlib import colors as mcolors
+from matplotlib.patches import Rectangle
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -118,18 +121,46 @@ def apply_manual_selection(frame: pd.DataFrame, selection_path: Path) -> pd.Data
     return frame.merge(selected, on=["position", "interval"], how="inner")
 
 
-def aggregate_points(frame: pd.DataFrame) -> pd.DataFrame:
+def combined_standard_error(values: pd.Series) -> float:
+    """Combine independent one-sigma errors for one averaged grid point."""
+    numeric = pd.to_numeric(values, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    if numeric.empty:
+        return float("nan")
+    return float(np.sqrt(np.sum(np.square(numeric))) / len(numeric))
+
+
+def standard_deviation_limits(frame: pd.DataFrame, value_column: str) -> tuple[float | None, float | None]:
+    """Return mean +/- 1 SD for one selected fit family."""
+    values = numeric_values(frame, value_column).dropna()
+    if values.empty:
+        return None, None
+    center = float(values.mean())
+    spread = float(values.std(ddof=0))
+    if not np.isfinite(spread):
+        return max(center, 0.0), max(center, 0.0)
+    return max(center - spread, 0.0), max(center + spread, 0.0)
+
+
+def format_significant(value: float) -> str:
+    """Format one numeric value with three significant figures."""
+    return f"{value:.3g}"
+
+
+def aggregate_points(frame: pd.DataFrame, error_column: str | None = None) -> pd.DataFrame:
     """Average repeated rows at the same position and wavelength center."""
     if frame.empty:
         return frame.copy()
+    aggregations = {
+        "plot_value": ("plot_value", "mean"),
+        "replicate_count": ("plot_value", "size"),
+        "band_min_nm": ("band_min_nm", "min"),
+        "band_max_nm": ("band_max_nm", "max"),
+    }
+    if error_column is not None and "plot_error" in frame.columns:
+        aggregations["plot_error"] = ("plot_error", combined_standard_error)
     return (
         frame.groupby(["position", "band_center_nm"], dropna=False)
-        .agg(
-            plot_value=("plot_value", "mean"),
-            replicate_count=("plot_value", "size"),
-            band_min_nm=("band_min_nm", "min"),
-            band_max_nm=("band_max_nm", "max"),
-        )
+        .agg(**aggregations)
         .reset_index()
     )
 
@@ -140,10 +171,12 @@ def plot_sample_grid(
     frame: pd.DataFrame,
     value_column: str,
     value_label: str,
+    error_column: str | None,
     title_prefix: str,
     out_base: Path,
     outlier_threshold: float | None = None,
     color_min: float | None = None,
+    color_max: float | None = None,
 ) -> None:
     """Plot one sample as positions x wavelength intervals with fit values as colored points."""
     if frame.empty:
@@ -151,69 +184,77 @@ def plot_sample_grid(
 
     values = numeric_values(frame, value_column)
     centers = numeric_values(frame, "band_center_nm")
-    plot_frame = frame.assign(plot_value=values, band_center_nm=centers).dropna(
-        subset=["plot_value", "band_center_nm"]
-    )
+    errors = numeric_values(frame, error_column) if error_column is not None and error_column in frame else None
+    plot_frame = frame.assign(
+        plot_value=values,
+        band_center_nm=centers,
+        plot_error=errors if errors is not None else np.nan,
+    ).dropna(subset=["plot_value", "band_center_nm"])
     if plot_frame.empty:
         return
 
-    outlier_frame = pd.DataFrame(columns=plot_frame.columns)
-    if outlier_threshold is not None:
-        outlier_mask = plot_frame["plot_value"] > outlier_threshold
-        outlier_frame = plot_frame[outlier_mask].copy()
-        plot_frame = plot_frame[~outlier_mask].copy()
-
     positions = sorted(plot_frame["position"].dropna().unique(), key=position_sort_key)
-    if not outlier_frame.empty:
-        positions = sorted(
-            set(positions).union(outlier_frame["position"].dropna().unique()),
-            key=position_sort_key,
-        )
-    plot_frame = aggregate_points(plot_frame)
-    outlier_frame = aggregate_points(outlier_frame)
-    axis_frame = pd.concat(
-        [plot_frame, outlier_frame],
-        ignore_index=True,
-    )
+    plot_frame = aggregate_points(plot_frame, error_column=error_column)
+    axis_frame = plot_frame.copy()
     centers = sorted(plot_frame["band_center_nm"].dropna().unique())
-    if not outlier_frame.empty:
-        centers = sorted(set(centers).union(outlier_frame["band_center_nm"].dropna().unique()))
     y_index = {position: index for index, position in enumerate(positions)}
     x = plot_frame["band_center_nm"].to_numpy(dtype=float)
     y = plot_frame["position"].map(y_index).astype(float).to_numpy()
     color_values = plot_frame["plot_value"].to_numpy(dtype=float)
+    error_values = numeric_values(plot_frame, "plot_error") if "plot_error" in plot_frame else pd.Series(dtype=float)
 
-    width = max(6.0, 0.18 * len(centers) + 3.6)
-    height = max(5.2, 0.50 * len(positions) + 2.2)
-    set_publication_style(base_font_size=8.0)
+    width = max(8.2, 0.34 * len(centers) + 4.4)
+    height = max(6.2, 0.78 * len(positions) + 2.7)
+    set_publication_style(base_font_size=10.0)
     fig, ax = plt.subplots(figsize=(width, height), constrained_layout=True)
-    scatter = None
-    if not plot_frame.empty:
-        scatter_kwargs = {}
-        if outlier_threshold is not None:
-            scatter_kwargs = {"vmin": color_min, "vmax": outlier_threshold}
-        scatter = ax.scatter(
-            x,
-            y,
-            c=color_values,
-            cmap="viridis",
-            s=48,
-            marker="o",
-            linewidths=0.45,
-            edgecolors=COLORS["black"],
-            alpha=0.92,
-            **scatter_kwargs,
+    colormap = cm.get_cmap("managua")
+    lower = float(color_min) if color_min is not None else float(np.nanmin(color_values))
+    upper = float(color_max) if color_max is not None else float(np.nanmax(color_values))
+    if not np.isfinite(lower):
+        lower = 0.0
+    if not np.isfinite(upper) or upper <= lower:
+        upper = lower + 1.0
+    norm = mcolors.Normalize(vmin=lower, vmax=upper, clip=True)
+    x_step = float(np.median(np.diff(centers))) if len(centers) > 1 else 20.0
+    marker_width = min(max(0.30 * x_step, 4.0), 8.0)
+    marker_height = 0.055
+    for row in plot_frame.itertuples(index=False):
+        error_text = ""
+        if np.isfinite(getattr(row, "plot_error", np.nan)):
+            error_text = "+/-" + format_significant(float(row.plot_error))
+        y_center = float(y_index[row.position])
+        x_center = float(row.band_center_nm)
+        ax.add_patch(
+            Rectangle(
+                (x_center - marker_width / 2.0, y_center + 0.035),
+                marker_width,
+                marker_height,
+                facecolor=colormap(norm(float(row.plot_value))),
+                edgecolor="none",
+                alpha=0.95,
+                zorder=2.5,
+            )
         )
-    if not outlier_frame.empty:
-        ax.scatter(
-            outlier_frame["band_center_nm"].to_numpy(dtype=float),
-            outlier_frame["position"].map(y_index).astype(float).to_numpy(),
-            s=56,
-            marker="x",
-            linewidths=1.0,
-            color=COLORS["vermillion"],
-            label=f">{outlier_threshold:g} ns outlier" if outlier_threshold is not None else "outlier",
+        ax.text(
+            x_center,
+            y_center - 0.12,
+            format_significant(float(row.plot_value)),
+            ha="center",
+            va="center",
+            fontsize=10.5,
+            fontweight="semibold",
+            color=COLORS["black"],
         )
+        if error_text:
+            ax.text(
+                x_center,
+                y_center + 0.18,
+                error_text,
+                ha="center",
+                va="center",
+                fontsize=7.2,
+                color="#27313B",
+            )
     ax.set_xticks(centers)
     ax.set_xticklabels([format_nm_tick(center) for center in centers])
     ax.set_yticks(range(len(positions)))
@@ -226,11 +267,8 @@ def plot_sample_grid(
     ax.set_title(f"{title_prefix}: {sample_name}", pad=5)
     apply_axes_style(ax, grid=True, minor_ticks=False)
     ax.set_axisbelow(True)
-    if scatter is not None:
-        colorbar = fig.colorbar(scatter, ax=ax, pad=0.015, fraction=0.035)
-        colorbar.set_label(value_label)
-    if not outlier_frame.empty:
-        ax.legend(loc="upper right", frameon=True, framealpha=0.88, facecolor="white", edgecolor="#C9CED6")
+    colorbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=colormap), ax=ax, pad=0.015, fraction=0.035)
+    colorbar.set_label(value_label)
     save_figure(fig, out_base.with_suffix(".png"), dpi=260)
     save_figure(fig, out_base.with_suffix(".pdf"))
     plt.close(fig)
@@ -241,6 +279,7 @@ def write_summary_plots(
     table_path: Path,
     value_column: str,
     value_label: str,
+    error_column: str | None,
     title_prefix: str,
     out_dir: Path,
     fiber_names: FiberNameMap,
@@ -248,25 +287,46 @@ def write_summary_plots(
     selection_suffix: str,
     outlier_threshold: float | None = None,
     color_min: float | None = None,
+    color_max: float | None = None,
+    use_standard_deviation_limits: bool = False,
 ) -> int:
     """Write one grid plot per sample from one fit-result table."""
     frame = pd.read_csv(table_path, sep="\t")
     out_dir.mkdir(parents=True, exist_ok=True)
-    count = 0
+    selected_frames: dict[str, pd.DataFrame] = {}
+    selected_values: list[pd.DataFrame] = []
     for sample in sorted(frame["sample"].dropna().unique(), key=fiber_names.real_name):
         sample_frame = frame[frame["sample"] == sample].copy()
         selection_path = selection_dir / f"{sample}_{selection_suffix}_selection.txt"
         sample_frame = apply_manual_selection(sample_frame, selection_path)
+        selected_frames[sample] = sample_frame
+        if not sample_frame.empty:
+            selected_values.append(sample_frame)
+
+    effective_color_min = color_min
+    effective_color_max = color_max
+    effective_outlier_threshold = outlier_threshold
+    if use_standard_deviation_limits and selected_values:
+        combined = pd.concat(selected_values, ignore_index=True)
+        effective_color_min, effective_color_max = standard_deviation_limits(combined, value_column)
+        if effective_outlier_threshold is not None:
+            effective_outlier_threshold = effective_color_max
+
+    count = 0
+    for sample in sorted(frame["sample"].dropna().unique(), key=fiber_names.real_name):
+        sample_frame = selected_frames[sample]
         out_base = out_dir / f"{sample}_{title_prefix.lower().replace(' ', '_')}_grid"
         plot_sample_grid(
             sample_name=fiber_names.real_name(sample),
             frame=sample_frame,
             value_column=value_column,
             value_label=value_label,
+            error_column=error_column,
             title_prefix=title_prefix,
             out_base=out_base,
-            outlier_threshold=outlier_threshold,
-            color_min=color_min,
+            outlier_threshold=effective_outlier_threshold,
+            color_min=effective_color_min,
+            color_max=effective_color_max,
         )
         count += 1
     return count
@@ -292,23 +352,26 @@ def main(argv: list[str] | None = None) -> int:
         table_path=fit_dir / "rise_time_2ns" / "rise_time_fits_2ns.txt",
         value_column="fitted_rise_time_10_90_ns",
         value_label="10-90% rise time (ns)",
+        error_column="fitted_rise_time_10_90_se_ns",
         title_prefix="Rise time",
         out_dir=out_root / "rise_time_2ns",
         fiber_names=fiber_names,
-        selection_dir=selection_root / "rise_time_2ns",
-        selection_suffix="rise_time_2ns_by_position_interval",
+        selection_dir=selection_root / "decay_time_10ns",
+        selection_suffix="decay_time_10ns_by_position_interval",
+        use_standard_deviation_limits=True,
     )
     decay_count = write_summary_plots(
         table_path=fit_dir / "decay_time_10ns" / "decay_time_fits_10ns.txt",
         value_column="tau_ns",
         value_label="Decay time tau (ns)",
+        error_column="tau_se_ns",
         title_prefix="Decay time",
         out_dir=out_root / "decay_time_10ns",
         fiber_names=fiber_names,
         selection_dir=selection_root / "decay_time_10ns",
         selection_suffix="decay_time_10ns_by_position_interval",
-        outlier_threshold=3.0,
-        color_min=1.0,
+        outlier_threshold=3.5,
+        use_standard_deviation_limits=True,
     )
     print(f"rise summary plots: {rise_count}")
     print(f"decay summary plots: {decay_count}")
