@@ -19,13 +19,14 @@ from tqdm import tqdm
 
 from .batch_carpet_wavelength_cuts import sigmoid_rise
 from .carpet_wavelength_cuts import exp_decay
-from .paths import DEFAULT_RESULTS_DIR, resolve_path
+from .paths import DEFAULT_MANUAL_SELECTIONS_DIR, DEFAULT_RESULTS_DIR, resolve_path, resolve_selection_root
 from .plot_style import COLORS, apply_axes_style, save_figure, set_publication_style
 
 
 DEFAULT_CUTS_SUBDIR = "carpet_wavelength_cuts_20nm_txt"
 DEFAULT_OUT_SUBDIR = "wavelength_cut_fit_results_2ns_rise_10ns_decay"
-DECAY_MODEL_LABEL = "Model: y = A exp[-(t-t0)/tau], B = 0"
+BASELINE_ESTIMATE_WINDOW_NS = 0.5
+DECAY_MODEL_LABEL = "Model: y = A exp[-(t-t0)/tau] + B"
 DOUBLE_DECAY_MODEL_LABEL = "Model: y = A1 exp[-dt/tau1] + A2 exp[-dt/tau2], B = 0"
 DECAY_SELECTION_SUFFIX = "_decay_time_10ns_by_position_interval_selection.txt"
 DECAY_FIT_END_OVERRIDES_NS = {
@@ -146,6 +147,22 @@ def manual_fit_end_index(time_ns: np.ndarray, fit_start_idx: int, fit_end_ns: fl
     return end_idx if end_idx > fit_start_idx + 2 else None
 
 
+def initial_baseline_counts(time_ns: np.ndarray, counts: np.ndarray) -> float:
+    """Estimate baseline from the first 0.5 ns of the raw signal."""
+    finite_mask = np.isfinite(time_ns) & np.isfinite(counts)
+    if not np.any(finite_mask):
+        return 0.0
+    trace_start = float(np.nanmin(time_ns[finite_mask]))
+    window_mask = finite_mask & (time_ns >= trace_start) & (time_ns <= trace_start + BASELINE_ESTIMATE_WINDOW_NS)
+    if not np.any(window_mask):
+        window_mask = finite_mask & (time_ns <= trace_start + BASELINE_ESTIMATE_WINDOW_NS)
+    values = counts[window_mask]
+    if values.size == 0:
+        values = counts[finite_mask][: max(1, min(5, int(np.count_nonzero(finite_mask))))]
+    baseline = float(np.nanmean(values)) if values.size else 0.0
+    return max(baseline, 0.0) if math.isfinite(baseline) else 0.0
+
+
 def progress_bar(iterable, **kwargs):
     """Return a Codex-visible progress bar for long manual runs."""
     return tqdm(iterable, file=sys.stdout, dynamic_ncols=True, ascii=True, **kwargs)
@@ -194,11 +211,16 @@ def plot_decay_fit(path: Path, time_ns: np.ndarray, counts: np.ndarray, row: pd.
     ax.text(
         0.98,
         0.95,
-        f"{DECAY_MODEL_LABEL}\ntau = {tau:.3g} {plus_minus(tau_se)}\nR^2 = {float(row['r_squared']):.3f}\npoints = {int(row['fit_points'])}",
+        (
+            f"{DECAY_MODEL_LABEL}\n"
+            f"B = {baseline:.3g} counts (first {BASELINE_ESTIMATE_WINDOW_NS:g} ns avg)\n"
+            f"tau = {tau:.3g} {plus_minus(tau_se)}\n"
+            f"R^2 = {float(row['r_squared']):.3f}, points = {int(row['fit_points'])}"
+        ),
         transform=ax.transAxes,
         va="top",
         ha="right",
-        fontsize=7.0,
+        fontsize=6.8,
         bbox={"boxstyle": "square,pad=0.25", "facecolor": "white", "edgecolor": "#C9CED6", "alpha": 0.92},
     )
     ax.set_title(title, pad=4)
@@ -415,9 +437,8 @@ def forced_decay_fit_row(
     x_fit = time_ns[fit_start_idx:fit_end_idx]
     y_fit = y[fit_start_idx:fit_end_idx]
     t0 = float(x_fit[0])
-    tail = y_fit[max(0, int(0.8 * len(y_fit))) :]
-    baseline0 = max(0.0, float(np.nanpercentile(tail, 20)))
-    amplitude0 = max(float(y_fit[0]), float(np.nanmax(y_fit) - baseline0), 1.0e-6)
+    baseline_estimate = initial_baseline_counts(time_ns, y)
+    amplitude0 = max(float(y_fit[0] - baseline_estimate), float(np.nanmax(y_fit) - baseline_estimate), 1.0e-6)
     duration = max(float(x_fit[-1] - x_fit[0]), 0.03)
     tau0 = min(max(duration / 3.0, 0.03), 200.0)
 
@@ -425,7 +446,7 @@ def forced_decay_fit_row(
     fit_note = ""
     try:
         popt, pcov = curve_fit(
-            lambda x_data, amplitude, tau_ns: exp_decay(x_data, amplitude, tau_ns, 0.0, t0),
+            lambda x_data, amplitude, tau_ns: exp_decay(x_data, amplitude, tau_ns, baseline_estimate, t0),
             x_fit,
             y_fit,
             p0=[amplitude0, tau0],
@@ -440,7 +461,7 @@ def forced_decay_fit_row(
         popt = np.array([amplitude0, tau0], dtype=float)
         pcov = np.full((2, 2), np.nan)
 
-    y_pred = exp_decay(x_fit, float(popt[0]), float(popt[1]), 0.0, t0)
+    y_pred = exp_decay(x_fit, float(popt[0]), float(popt[1]), baseline_estimate, t0)
     residual = y_fit - y_pred
     ss_res = float(np.sum(residual**2))
     ss_tot = float(np.sum((y_fit - np.mean(y_fit)) ** 2))
@@ -456,7 +477,7 @@ def forced_decay_fit_row(
     forced["tau_ns"] = float(popt[1])
     forced["tau_se_ns"] = float(perr[1]) if len(perr) > 1 else float("nan")
     forced["amplitude_counts"] = float(popt[0])
-    forced["baseline_counts"] = 0.0
+    forced["baseline_counts"] = baseline_estimate
     forced["r_squared"] = r_squared
     forced["rmse_counts"] = rmse
     forced["peak_time_ns"] = peak_time
@@ -1058,8 +1079,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out-subdir", default=DEFAULT_OUT_SUBDIR)
     parser.add_argument("--rise-window", default="2ns")
     parser.add_argument("--decay-window", default="10ns")
+    parser.add_argument("--fit-family", choices=["all", "rise", "decay"], default="all")
     parser.add_argument("--decay-model", choices=["single", "double"], default="single")
-    parser.add_argument("--selection-subdir", default="manual selections")
+    parser.add_argument("--selection-subdir", type=Path, default=DEFAULT_MANUAL_SELECTIONS_DIR)
     args = parser.parse_args(argv)
 
     results_dir = resolve_path(args.results_dir)
@@ -1073,7 +1095,7 @@ def main(argv: list[str] | None = None) -> int:
         entries = list(csv.DictReader(handle, delimiter="\t"))
 
     if args.decay_model == "double":
-        selection_dir = output_root / args.selection_subdir / "decay_time_10ns"
+        selection_dir = resolve_selection_root(args.selection_subdir, output_root) / "decay_time_10ns"
         selected = read_decay_manual_selection(selection_dir)
         selected_scan_keys = {(sample, position) for sample, position, _ in selected}
         selected_entries = [
@@ -1131,11 +1153,14 @@ def main(argv: list[str] | None = None) -> int:
         entry
         for entry in entries
         if entry.get("status") == "ok"
-        and source_time_window(entry.get("source_file", "")) in {args.rise_window, args.decay_window}
+        and (
+            (args.fit_family in {"all", "rise"} and source_time_window(entry.get("source_file", "")) == args.rise_window)
+            or (args.fit_family in {"all", "decay"} and source_time_window(entry.get("source_file", "")) == args.decay_window)
+        )
     ]
     for entry in progress_bar(selected_entries, desc="Fit result scans", unit="scan"):
         window = source_time_window(entry.get("source_file", ""))
-        if window == args.rise_window:
+        if args.fit_family in {"all", "rise"} and window == args.rise_window:
             rise_rows.extend(
                 process_fit_family(
                     entry=entry,
@@ -1145,7 +1170,7 @@ def main(argv: list[str] | None = None) -> int:
                     time_window=window,
                 )
             )
-        elif window == args.decay_window:
+        elif args.fit_family in {"all", "decay"} and window == args.decay_window:
             decay_rows.extend(
                 process_fit_family(
                     entry=entry,
@@ -1156,31 +1181,29 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
 
-    write_tsv(output_root / "rise_time_2ns" / "rise_time_fits_2ns.txt", rise_rows, RISE_FIELDS)
-    write_tsv(output_root / "decay_time_10ns" / "decay_time_fits_10ns.txt", decay_rows, DECAY_FIELDS)
-    write_sample_matrices(
-        rows=rise_rows,
-        value_field="fitted_rise_time_10_90_ns",
-        out_dir=output_root / "tabulated_by_sample" / "rise_time_2ns",
-        file_suffix="rise_time_2ns_by_position_interval",
-    )
-    write_sample_matrices(
-        rows=decay_rows,
-        value_field="tau_ns",
-        out_dir=output_root / "tabulated_by_sample" / "decay_time_10ns",
-        file_suffix="decay_time_10ns_by_position_interval",
-    )
-    write_tsv(
-        output_root / "fit_result_inventory.txt",
-        [
-            {"fit_type": "rise", "time_window": args.rise_window, "fit_count": len(rise_rows)},
-            {"fit_type": "decay", "time_window": args.decay_window, "fit_count": len(decay_rows)},
-        ],
-        ["fit_type", "time_window", "fit_count"],
-    )
-
-    print(f"rise fits ({args.rise_window}): {len(rise_rows)}")
-    print(f"decay fits ({args.decay_window}): {len(decay_rows)}")
+    inventory_rows = []
+    if args.fit_family in {"all", "rise"}:
+        write_tsv(output_root / "rise_time_2ns" / "rise_time_fits_2ns.txt", rise_rows, RISE_FIELDS)
+        write_sample_matrices(
+            rows=rise_rows,
+            value_field="fitted_rise_time_10_90_ns",
+            out_dir=output_root / "tabulated_by_sample" / "rise_time_2ns",
+            file_suffix="rise_time_2ns_by_position_interval",
+        )
+        inventory_rows.append({"fit_type": "rise", "time_window": args.rise_window, "fit_count": len(rise_rows)})
+        print(f"rise fits ({args.rise_window}): {len(rise_rows)}")
+    if args.fit_family in {"all", "decay"}:
+        write_tsv(output_root / "decay_time_10ns" / "decay_time_fits_10ns.txt", decay_rows, DECAY_FIELDS)
+        write_sample_matrices(
+            rows=decay_rows,
+            value_field="tau_ns",
+            out_dir=output_root / "tabulated_by_sample" / "decay_time_10ns",
+            file_suffix="decay_time_10ns_by_position_interval",
+        )
+        inventory_rows.append({"fit_type": "decay", "time_window": args.decay_window, "fit_count": len(decay_rows)})
+        print(f"decay fits ({args.decay_window}): {len(decay_rows)}")
+    if args.fit_family == "all":
+        write_tsv(output_root / "fit_result_inventory.txt", inventory_rows, ["fit_type", "time_window", "fit_count"])
     print(f"output: {output_root}")
     return 0
 

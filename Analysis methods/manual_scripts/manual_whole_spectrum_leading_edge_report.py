@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from manual_common import FIBER_NAMES_CONFIG, MANUAL_SELECTIONS_DIR, RESULTS_DIR, show_settings, use_methods_package
+from manual_common import FIBER_NAMES_CONFIG, RESULTS_DIR, show_settings, use_methods_package
 
 
 # =========================
 # Manual analysis preamble
 # =========================
 
+CUTS_SUBDIR = "carpet_wavelength_cuts_20nm_txt"
 FIT_SUBDIR = "wavelength_cut_fit_results_2ns_rise_10ns_decay"
-OUT_SUBDIR = "summary grids"
-SELECTION_DIR = MANUAL_SELECTIONS_DIR
+RISE_WINDOW = "2ns"
+ROBUST_Z_LIMIT = 3.5
 
 
 # =========================
@@ -18,32 +19,35 @@ SELECTION_DIR = MANUAL_SELECTIONS_DIR
 
 use_methods_package()
 
-from lhcb_fibers_analysis import wavelength_cut_summary_plots  # noqa: E402
+from lhcb_fibers_analysis import whole_spectrum_leading_edge_report  # noqa: E402
 
 
 def main() -> int:
     show_settings(
-        "Manual wavelength-cut summary plots",
+        "Manual whole-spectrum leading-edge report",
         [
+            ("cuts", RESULTS_DIR / CUTS_SUBDIR),
             ("fit results", RESULTS_DIR / FIT_SUBDIR),
-            ("output", RESULTS_DIR / FIT_SUBDIR / OUT_SUBDIR),
-            ("manual selections", SELECTION_DIR),
+            ("rise window", RISE_WINDOW),
+            ("robust z limit", ROBUST_Z_LIMIT),
             ("fiber names", FIBER_NAMES_CONFIG),
         ],
     )
     args = [
         "--results-dir",
         str(RESULTS_DIR),
+        "--cuts-subdir",
+        CUTS_SUBDIR,
         "--fit-subdir",
         FIT_SUBDIR,
-        "--out-subdir",
-        OUT_SUBDIR,
-        "--selection-subdir",
-        str(SELECTION_DIR),
+        "--rise-window",
+        RISE_WINDOW,
         "--fiber-names-config",
         str(FIBER_NAMES_CONFIG),
+        "--robust-z-limit",
+        str(ROBUST_Z_LIMIT),
     ]
-    return wavelength_cut_summary_plots.main(args)
+    return whole_spectrum_leading_edge_report.main(args)
 
 
 if __name__ == "__main__":

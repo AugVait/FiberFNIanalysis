@@ -6,7 +6,6 @@ from pathlib import Path
 import matplotlib
 from matplotlib import cm
 from matplotlib import colors as mcolors
-from matplotlib.patches import Rectangle
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -14,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from .fiber_names import FiberNameMap, read_fiber_name_map
-from .paths import DEFAULT_FIBER_NAMES_CONFIG, DEFAULT_RESULTS_DIR, resolve_path
+from .paths import DEFAULT_FIBER_NAMES_CONFIG, DEFAULT_MANUAL_SELECTIONS_DIR, DEFAULT_RESULTS_DIR, resolve_path, resolve_selection_root
 from .plot_style import COLORS, apply_axes_style, save_figure, set_publication_style
 from .wavelength_cut_fit_results import DEFAULT_OUT_SUBDIR, interval_sort_key, position_sort_key
 
@@ -215,29 +214,25 @@ def plot_sample_grid(
     if not np.isfinite(upper) or upper <= lower:
         upper = lower + 1.0
     norm = mcolors.Normalize(vmin=lower, vmax=upper, clip=True)
-    x_step = float(np.median(np.diff(centers))) if len(centers) > 1 else 20.0
-    marker_width = min(max(0.30 * x_step, 4.0), 8.0)
-    marker_height = 0.055
     for row in plot_frame.itertuples(index=False):
         error_text = ""
         if np.isfinite(getattr(row, "plot_error", np.nan)):
             error_text = "+/-" + format_significant(float(row.plot_error))
         y_center = float(y_index[row.position])
         x_center = float(row.band_center_nm)
-        ax.add_patch(
-            Rectangle(
-                (x_center - marker_width / 2.0, y_center + 0.035),
-                marker_width,
-                marker_height,
-                facecolor=colormap(norm(float(row.plot_value))),
-                edgecolor="none",
-                alpha=0.95,
-                zorder=2.5,
-            )
+        ax.scatter(
+            [x_center],
+            [y_center],
+            marker="s",
+            s=220,
+            c=[colormap(norm(float(row.plot_value)))],
+            edgecolors="#2A323A",
+            linewidths=0.45,
+            zorder=3.0,
         )
         ax.text(
             x_center,
-            y_center - 0.12,
+            y_center + 0.20,
             format_significant(float(row.plot_value)),
             ha="center",
             va="center",
@@ -248,7 +243,7 @@ def plot_sample_grid(
         if error_text:
             ax.text(
                 x_center,
-                y_center + 0.18,
+                y_center - 0.22,
                 error_text,
                 ha="center",
                 va="center",
@@ -261,7 +256,6 @@ def plot_sample_grid(
     ax.set_yticklabels(positions)
     ax.set_xlim(*wavelength_xlim(axis_frame))
     ax.set_ylim(-0.65, len(positions) - 0.35)
-    ax.invert_yaxis()
     ax.set_xlabel("Wavelength center (nm)")
     ax.set_ylabel("Position")
     ax.set_title(f"{title_prefix}: {sample_name}", pad=5)
@@ -338,7 +332,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
     parser.add_argument("--fit-subdir", default=DEFAULT_OUT_SUBDIR)
     parser.add_argument("--out-subdir", default="summary grids")
-    parser.add_argument("--selection-subdir", default="manual selections")
+    parser.add_argument("--selection-subdir", type=Path, default=DEFAULT_MANUAL_SELECTIONS_DIR)
     parser.add_argument("--fiber-names-config", type=Path, default=DEFAULT_FIBER_NAMES_CONFIG)
     args = parser.parse_args(argv)
 
@@ -347,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     fiber_names = read_fiber_name_map(fiber_names_config)
     fit_dir = results_dir / args.fit_subdir
     out_root = fit_dir / args.out_subdir
-    selection_root = fit_dir / args.selection_subdir
+    selection_root = resolve_selection_root(args.selection_subdir, fit_dir)
     rise_count = write_summary_plots(
         table_path=fit_dir / "rise_time_2ns" / "rise_time_fits_2ns.txt",
         value_column="fitted_rise_time_10_90_ns",

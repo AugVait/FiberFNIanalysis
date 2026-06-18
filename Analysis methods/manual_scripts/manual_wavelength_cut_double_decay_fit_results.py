@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from manual_common import RESULTS_DIR, show_settings, use_methods_package
+from manual_common import MANUAL_SELECTIONS_DIR, RESULTS_DIR, show_settings, use_methods_package
 
 
 # =========================
@@ -11,7 +11,7 @@ from manual_common import RESULTS_DIR, show_settings, use_methods_package
 CUTS_SUBDIR = "carpet_wavelength_cuts_20nm_txt"
 OUT_SUBDIR = "wavelength_cut_fit_results_2ns_rise_10ns_decay"
 DECAY_WINDOW = "10ns"
-SELECTION_SUBDIR = "manual selections"
+SELECTION_DIR = MANUAL_SELECTIONS_DIR
 
 
 # =========================
@@ -30,7 +30,7 @@ def main() -> int:
             ("cuts", RESULTS_DIR / CUTS_SUBDIR),
             ("output", RESULTS_DIR / OUT_SUBDIR / "decay_time_10ns_double_exp"),
             ("decay window", DECAY_WINDOW),
-            ("manual selections", RESULTS_DIR / OUT_SUBDIR / SELECTION_SUBDIR / "decay_time_10ns"),
+            ("manual selections", SELECTION_DIR / "decay_time_10ns"),
         ],
     )
     args = [
@@ -45,7 +45,7 @@ def main() -> int:
         "--decay-model",
         "double",
         "--selection-subdir",
-        SELECTION_SUBDIR,
+        str(SELECTION_DIR),
     ]
     return wavelength_cut_fit_results.main(args)
 

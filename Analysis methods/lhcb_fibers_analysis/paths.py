@@ -18,9 +18,20 @@ DEFAULT_IT_DECAY_CONFIG = DEFAULT_CONFIGS_DIR / "it_decay_fits_all_it_10ns_windo
 DEFAULT_PEAK_SHIFT_CONFIG = DEFAULT_CONFIGS_DIR / "peak_position_shift.yaml"
 DEFAULT_RUN_ALL_CONFIG = DEFAULT_CONFIGS_DIR / "run_all.yaml"
 DEFAULT_FIBER_NAMES_CONFIG = DEFAULT_CONFIGS_DIR / "fiber_names.yaml"
+DEFAULT_MANUAL_SELECTIONS_DIR = DEFAULT_CONFIGS_DIR / "manual selections"
 DEFAULT_MANIFEST = METHODS_ROOT / "raw_data_manifest.json"
 
 
 def resolve_path(path: str | Path) -> Path:
     """Expand and resolve a filesystem path."""
     return Path(path).expanduser().resolve()
+
+
+def resolve_selection_root(path: str | Path, fit_dir: Path) -> Path:
+    """Resolve manual selection path, preserving legacy fit-subdir names."""
+    selection_path = Path(path).expanduser()
+    if selection_path.is_absolute():
+        return selection_path.resolve()
+    if len(selection_path.parts) == 1:
+        return (fit_dir / selection_path).resolve()
+    return selection_path.resolve()

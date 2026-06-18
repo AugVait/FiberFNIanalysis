@@ -24,6 +24,7 @@ INTERVAL_NM = 20.0
 RANGE_MODE = "common"  # "common" keeps the same clean bands for every scan; "per-scan" uses each scan's full range.
 WAVELENGTH_MIN_NM = 380.0
 WAVELENGTH_MAX_NM = 720.0
+EXTRA_BANDS = ("360-380",)
 TOP_EDGE_CROP_ROWS = 12
 
 SMOOTH_SIGMA = 2.0
@@ -74,6 +75,7 @@ def main() -> int:
             ("range mode", RANGE_MODE),
             ("wavelength min nm", WAVELENGTH_MIN_NM),
             ("wavelength max nm", WAVELENGTH_MAX_NM),
+            ("extra bands", EXTRA_BANDS),
             ("fit start ns", FIT_START_NS),
             ("fit end ns", FIT_END_NS),
             ("write fit curves", WRITE_FIT_CURVES),
@@ -115,6 +117,7 @@ def main() -> int:
         str(TAU_MAX_NS),
     ]
     add_repeated(args, "--time-window", TIME_WINDOWS)
+    add_repeated(args, "--extra-band", EXTRA_BANDS)
     add_optional(args, "--wavelength-min-nm", WAVELENGTH_MIN_NM)
     add_optional(args, "--wavelength-max-nm", WAVELENGTH_MAX_NM)
     add_optional(args, "--fit-start-ns", FIT_START_NS)

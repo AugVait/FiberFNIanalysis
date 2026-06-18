@@ -182,6 +182,27 @@ def clean_band_edges(
     return bands
 
 
+def parse_extra_band(text: str) -> tuple[float, float]:
+    """Parse an extra wavelength interval such as 360-380."""
+    match = re.fullmatch(r"\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[-:,]\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*", text)
+    if not match:
+        raise argparse.ArgumentTypeError(f"Invalid extra band {text!r}; use min-max, e.g. 360-380")
+    start = float(match.group(1))
+    end = float(match.group(2))
+    if end <= start:
+        raise argparse.ArgumentTypeError(f"Invalid extra band {text!r}; max must be greater than min")
+    return start, end
+
+
+def with_extra_band_edges(
+    band_edges: list[tuple[float, float]],
+    extra_edges: list[tuple[float, float]],
+) -> list[tuple[float, float]]:
+    """Return band edges plus extra intervals, sorted and de-duplicated."""
+    combined = [(float(start), float(end)) for start, end in band_edges + extra_edges]
+    return sorted(set(combined), key=lambda item: (item[0], item[1]))
+
+
 def common_wavelength_bounds(paths: list[Path]) -> tuple[float, float]:
     """Return the wavelength range fully covered by all calibrated scans."""
     starts: list[float] = []
@@ -774,6 +795,7 @@ def process_scan(
     range_mode: str,
     wavelength_min_nm: float | None,
     wavelength_max_nm: float | None,
+    extra_band_edges: list[tuple[float, float]],
     top_edge_crop_rows: int,
     smooth_sigma: float,
     fit_start_ns: float | None,
@@ -812,6 +834,7 @@ def process_scan(
                 explicit_min_nm=wavelength_min_nm,
                 explicit_max_nm=wavelength_max_nm,
             )
+            scan_band_edges = with_extra_band_edges(scan_band_edges, extra_band_edges)
         else:
             local_bounds = (float(np.nanmin(wavelengths)), float(np.nanmax(wavelengths)))
             scan_band_edges = band_edges
@@ -974,6 +997,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--wavelength-min-nm", type=float, default=None)
     parser.add_argument("--wavelength-max-nm", type=float, default=None)
+    parser.add_argument(
+        "--extra-band",
+        dest="extra_bands",
+        action="append",
+        type=parse_extra_band,
+        default=[],
+        help="Add one extra wavelength interval, e.g. --extra-band 360-380. Repeat as needed.",
+    )
     parser.add_argument("--top-edge-crop-rows", type=int, default=TOP_EDGE_CROP_ROWS)
     parser.add_argument("--smooth-sigma", type=float, default=2.0)
     parser.add_argument("--fit-start-ns", type=float, default=None)
@@ -1016,6 +1047,7 @@ def main(argv: list[str] | None = None) -> int:
             explicit_min_nm=args.wavelength_min_nm,
             explicit_max_nm=args.wavelength_max_nm,
         )
+        band_edges = with_extra_band_edges(band_edges, args.extra_bands)
         if not band_edges:
             raise SystemExit("No clean wavelength bands fit inside the common wavelength range.")
     else:
@@ -1033,6 +1065,7 @@ def main(argv: list[str] | None = None) -> int:
             range_mode=args.range_mode,
             wavelength_min_nm=args.wavelength_min_nm,
             wavelength_max_nm=args.wavelength_max_nm,
+            extra_band_edges=args.extra_bands,
             top_edge_crop_rows=args.top_edge_crop_rows,
             smooth_sigma=args.smooth_sigma,
             fit_start_ns=args.fit_start_ns,

@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter1d
 from tqdm import tqdm
 
 from .fiber_names import read_fiber_name_map
-from .paths import DEFAULT_FIBER_NAMES_CONFIG, DEFAULT_RESULTS_DIR, resolve_path
+from .paths import DEFAULT_FIBER_NAMES_CONFIG, DEFAULT_MANUAL_SELECTIONS_DIR, DEFAULT_RESULTS_DIR, resolve_path, resolve_selection_root
 from .wavelength_cut_fit_results import (
     DEFAULT_CUTS_SUBDIR,
     DEFAULT_OUT_SUBDIR,
@@ -196,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cuts-subdir", default=DEFAULT_CUTS_SUBDIR)
     parser.add_argument("--fit-subdir", default=DEFAULT_OUT_SUBDIR)
     parser.add_argument("--rise-window", default="2ns")
-    parser.add_argument("--selection-subdir", default="manual selections")
+    parser.add_argument("--selection-subdir", type=Path, default=DEFAULT_MANUAL_SELECTIONS_DIR)
     parser.add_argument("--fiber-names-config", type=Path, default=DEFAULT_FIBER_NAMES_CONFIG)
     args = parser.parse_args(argv)
 
@@ -226,7 +226,7 @@ def main(argv: list[str] | None = None) -> int:
         title_prefix="Leading edge position",
         out_dir=fit_dir / "summary grids" / "leading_edge_position_2ns",
         fiber_names=fiber_names,
-        selection_dir=fit_dir / args.selection_subdir / "decay_time_10ns",
+        selection_dir=resolve_selection_root(args.selection_subdir, fit_dir) / "decay_time_10ns",
         selection_suffix="decay_time_10ns_by_position_interval",
         use_standard_deviation_limits=True,
     )

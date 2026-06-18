@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from manual_common import FIBER_NAMES_CONFIG, RESULTS_DIR, show_settings, use_methods_package
+from manual_common import FIBER_NAMES_CONFIG, MANUAL_SELECTIONS_DIR, RESULTS_DIR, show_settings, use_methods_package
 
 
 # =========================
@@ -10,7 +10,7 @@ from manual_common import FIBER_NAMES_CONFIG, RESULTS_DIR, show_settings, use_me
 CUTS_SUBDIR = "carpet_wavelength_cuts_20nm_txt"
 FIT_SUBDIR = "wavelength_cut_fit_results_2ns_rise_10ns_decay"
 RISE_WINDOW = "2ns"
-SELECTION_SUBDIR = "manual selections"
+SELECTION_DIR = MANUAL_SELECTIONS_DIR
 
 
 # =========================
@@ -29,7 +29,7 @@ def main() -> int:
             ("cuts", RESULTS_DIR / CUTS_SUBDIR),
             ("fit results", RESULTS_DIR / FIT_SUBDIR),
             ("rise window", RISE_WINDOW),
-            ("manual selections", RESULTS_DIR / FIT_SUBDIR / SELECTION_SUBDIR),
+            ("manual selections", SELECTION_DIR),
             ("fiber names", FIBER_NAMES_CONFIG),
         ],
     )
@@ -43,7 +43,7 @@ def main() -> int:
         "--rise-window",
         RISE_WINDOW,
         "--selection-subdir",
-        SELECTION_SUBDIR,
+        str(SELECTION_DIR),
         "--fiber-names-config",
         str(FIBER_NAMES_CONFIG),
     ]

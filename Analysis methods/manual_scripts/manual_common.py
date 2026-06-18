@@ -11,6 +11,7 @@ RAW_DIR = PROJECT_ROOT / "raw data"
 RESULTS_DIR = PROJECT_ROOT / "Analysis results"
 CONFIGS_DIR = METHODS_DIR / "configs"
 FIBER_NAMES_CONFIG = CONFIGS_DIR / "fiber_names.yaml"
+MANUAL_SELECTIONS_DIR = CONFIGS_DIR / "manual selections"
 
 
 def display_value(value: object) -> str:
